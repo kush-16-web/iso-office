@@ -39,7 +39,10 @@ export const ProfileCard = ({ user, position, onClose }: ProfileCardProps) => {
           <button className="flex items-center justify-center gap-1.5 bg-yellow-100 hover:bg-yellow-200 text-yellow-800 py-2 rounded-xl text-sm font-medium transition-colors">
             <User className="w-4 h-4" /> Profile
           </button>
-          <button className="flex items-center justify-center gap-1.5 border border-gray-200 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800 py-2 rounded-xl text-sm font-medium transition-colors">
+          <button
+            onClick={() => console.log(`Navigating to ${user.name}`)}
+            className="flex items-center justify-center gap-1.5 border border-gray-200 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800 py-2 rounded-xl text-sm font-medium transition-colors"
+          >
             <Navigation className="w-4 h-4" /> Go to
           </button>
           <button
