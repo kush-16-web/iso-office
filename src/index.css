@@ -1,0 +1,36 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand-yellow: #facc15;
+  --color-brand-yellow-hover: #eab308;
+  --color-floor-blue: #93c5fd;
+  --color-floor-amber: #fcd34d;
+  --color-dark-bg: #1f2937;
+  --color-dark-panel: #374151;
+  --color-dark-nav: #111827;
+}
+
+@layer base {
+  :root {
+    --bg-main: #f3f4f6;
+    --bg-nav: #111827;
+    --bg-panel: #ffffff;
+    --text-primary: #111827;
+    --text-secondary: #4b5563;
+    --border-color: #e5e7eb;
+  }
+
+  .dark {
+    --bg-main: #1f2937;
+    --bg-nav: #030712;
+    --bg-panel: #374151;
+    --text-primary: #f9fafb;
+    --text-secondary: #9ca3af;
+    --border-color: #4b5563;
+  }
+
+  body {
+    background-color: var(--bg-main);
+    color: var(--text-primary);
+  }
+}
