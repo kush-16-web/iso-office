@@ -8,7 +8,8 @@ export const IsoCanvas = () => {
   const { coworkers, currentUser } = useStore();
 
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [cardPosition, setCardPosition] = useState({ x: 0, y: 0 });
+
+  const cardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -105,11 +106,41 @@ export const IsoCanvas = () => {
     floorGroup.add(createDesk(4.5, 3, Math.PI / 2));
     floorGroup.add(createDesk(-2.5, 5, Math.PI / 2));
 
+
+
+    const createChair = (x: number, z: number, rotationY: number = 0) => {
+      const chairGroup = new THREE.Group();
+      chairGroup.position.set(x, 0, z);
+      chairGroup.rotation.y = rotationY;
+
+      const mat = new THREE.MeshStandardMaterial({ color: 0x374151 }); // dark gray
+
+      // Seat
+      const seat = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.1, 0.8), mat);
+      seat.position.y = 0.4;
+      seat.castShadow = true;
+      chairGroup.add(seat);
+
+      // Backrest
+      const back = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.6, 0.1), mat);
+      back.position.set(0, 0.75, -0.35);
+      back.castShadow = true;
+      chairGroup.add(back);
+
+      return chairGroup;
+    };
+
+
+    floorGroup.add(createChair(0, -0.8, Math.PI));
+    floorGroup.add(createChair(3.8, 3, Math.PI/2));
+    floorGroup.add(createChair(-1.8, 5, Math.PI/2));
+    floorGroup.add(createChair(2, 3.2, Math.PI));
+
     const createMeetingTable = (x: number, z: number) => {
       const tableGroup = new THREE.Group();
       tableGroup.position.set(x, 0, z);
 
-      const topGeo = new THREE.BoxGeometry(3, 0.1, 1.5);
+      const topGeo = new THREE.CylinderGeometry(1.5, 1.5, 0.1, 32);
       const topMat = new THREE.MeshStandardMaterial({ color: 0xd1d5db });
       const top = new THREE.Mesh(topGeo, topMat);
       top.position.y = 0.8;
@@ -159,6 +190,17 @@ export const IsoCanvas = () => {
     wall1.position.set(-12, 1, 8);
     scene.add(wall1);
 
+    // Low walls for lounge
+    const lowWallGeo = new THREE.BoxGeometry(16, 0.8, 0.2);
+    const lowWallMat = new THREE.MeshStandardMaterial({ color: 0xe5e7eb });
+    const loungeWall1 = new THREE.Mesh(lowWallGeo, lowWallMat);
+    loungeWall1.position.set(0, 0.15, -8);
+    scene.add(loungeWall1);
+
+    const loungeWall2 = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.8, 8), lowWallMat);
+    loungeWall2.position.set(-8, 0.15, -12);
+    scene.add(loungeWall2);
+
     // --- Characters ---
     const characters: THREE.Group[] = [];
     const animatables: { mesh: THREE.Group, offset: number }[] = [];
@@ -184,9 +226,17 @@ export const IsoCanvas = () => {
         // Sitting lower, slightly leaned forward
         charGroup.position.set(x, 0.4, z);
         body.rotation.x = 0.1;
+
+        // Add laptop
+        const laptopGeo = new THREE.BoxGeometry(0.5, 0.05, 0.4);
+        const laptopMat = new THREE.MeshStandardMaterial({ color: 0x9ca3af });
+        const laptop = new THREE.Mesh(laptopGeo, laptopMat);
+        laptop.position.set(0, 0.3, 0.5); // In front of the character
+        laptop.castShadow = true;
+        charGroup.add(laptop);
       } else {
         // Standing
-        charGroup.position.set(x, 0.6, z);
+        charGroup.position.set(x, pose === 'meeting' ? 0.4 : 0.6, z);
       }
 
       charGroup.userData = { user }; // Store user data for raycasting
@@ -206,7 +256,7 @@ export const IsoCanvas = () => {
     };
 
     // Current User
-    const meMesh = createCharacter(currentUser, 2, 2, 0x1f2937, 'working'); // Dark gray, at desk
+    const meMesh = createCharacter(currentUser, 2, 3.2, 0x1f2937, 'working'); // Dark gray, at desk
 
     // Proximity Ring (around current user)
     const ringGeo = new THREE.RingGeometry(4, 4.2, 32);
@@ -228,13 +278,15 @@ export const IsoCanvas = () => {
         const charMesh = createCharacter(user, x, z, color, 'meeting');
         // Face the center of the table
         charMesh.lookAt(centerX, charMesh.position.y, centerZ);
+        // Add chair under them
+        floorGroup.add(createChair(x, z, charMesh.rotation.y + Math.PI));
       });
     };
 
     // Coworkers (working at desks)
-    createCharacter(coworkers[0], 0, -1.5, 0xef4444, 'working'); // Red
-    createCharacter(coworkers[1], 4.5, 3, 0x3b82f6, 'working'); // Blue
-    createCharacter(coworkers[2], -2.5, 5, 0x10b981, 'working'); // Green
+    createCharacter(coworkers[0], 0, -0.8, 0xef4444, 'working'); // Shifted Z // Red
+    createCharacter(coworkers[1], 3.8, 3, 0x3b82f6, 'working'); // Shifted X // Blue
+    createCharacter(coworkers[2], -1.8, 5, 0x10b981, 'working'); // Shifted X // Green
 
     // Coworkers (clustered in meeting room)
     const meetingUsers = [coworkers[3], coworkers[4]];
@@ -252,11 +304,11 @@ export const IsoCanvas = () => {
       raycaster.setFromCamera(mouse, camera);
 
       // Intersect characters
-      const intersects = raycaster.intersectObjects(characters, false);
+      const intersects = raycaster.intersectObjects(characters, true);
 
       if (intersects.length > 0) {
         const clickedMesh = intersects[0].object as THREE.Mesh;
-        const user = clickedMesh.userData.user as User;
+        const user = (clickedMesh.parent?.userData.user || clickedMesh.userData.user) as User;
 
         setSelectedUser(user);
 
@@ -266,10 +318,7 @@ export const IsoCanvas = () => {
         vec.y += 1.5; // Offset above head
         vec.project(camera);
 
-        const x = (vec.x * .5 + .5) * rect.width;
-        const y = (vec.y * -.5 + .5) * rect.height;
 
-        setCardPosition({ x, y });
       } else {
         setSelectedUser(null);
       }
@@ -302,10 +351,10 @@ export const IsoCanvas = () => {
           vec.y += 1.5;
           vec.project(camera);
           const rect = renderer.domElement.getBoundingClientRect();
-          setCardPosition({
-            x: (vec.x * .5 + .5) * rect.width,
-            y: (vec.y * -.5 + .5) * rect.height
-          });
+          if (cardRef.current) {
+            cardRef.current.style.left = `${(vec.x * .5 + .5) * rect.width}px`;
+            cardRef.current.style.top = `${(vec.y * -.5 + .5) * rect.height}px`;
+          }
         }
       }
 
@@ -348,11 +397,13 @@ export const IsoCanvas = () => {
   return (
     <div className="w-full h-full relative" ref={containerRef}>
       {selectedUser && (
+        <div ref={cardRef} className="absolute top-0 left-0">
         <ProfileCard
           user={selectedUser}
-          position={cardPosition}
+          position={{x: 0, y: 0}}
           onClose={() => setSelectedUser(null)}
         />
+        </div>
       )}
     </div>
   );

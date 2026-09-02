@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { User, X, Navigation, MessageSquare,  } from 'lucide-react';
 import { type User as UserType } from './store';
 import { RewardWidget } from './RewardWidget';
@@ -18,7 +19,7 @@ export const ProfileCard = ({ user, position, onClose }: ProfileCardProps) => {
     <>
       <div
         className="absolute bg-[var(--bg-panel)] border border-[var(--border-color)] rounded-2xl shadow-xl w-64 p-4 z-30 transform -translate-x-1/2 -translate-y-[120%]"
-        style={{ left: position.x, top: position.y }}
+        style={position.x === 0 && position.y === 0 ? {} : { left: position.x, top: position.y }}
       >
         <button onClick={onClose} className="absolute top-2 right-2 p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800">
           <X className="w-4 h-4" />
@@ -60,8 +61,8 @@ export const ProfileCard = ({ user, position, onClose }: ProfileCardProps) => {
         </div>
       </div>
 
-      {showReward && <RewardWidget user={user} onClose={() => setShowReward(false)} />}
-      {showChat && <ChatPanel user={user} onClose={() => setShowChat(false)} />}
+      {showReward && createPortal(<RewardWidget user={user} onClose={() => setShowReward(false)} />, document.body)}
+      {showChat && createPortal(<ChatPanel user={user} onClose={() => setShowChat(false)} />, document.body)}
     </>
   );
 };
