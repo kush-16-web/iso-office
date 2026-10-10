@@ -1,0 +1,11 @@
+IsoOffice — demo build notes
+
+This is a sample attachment for the local UI preview.
+It contains no executable software.
+
+Updates
+- Floating conversations
+- Shared office directory
+- Message reactions and local attachments
+
+Messages and files reset when this page is reloaded.

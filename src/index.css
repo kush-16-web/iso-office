@@ -1,36 +1,20 @@
 @import "tailwindcss";
-
-@theme {
-  --color-brand-yellow: #facc15;
-  --color-brand-yellow-hover: #eab308;
-  --color-floor-blue: #93c5fd;
-  --color-floor-amber: #fcd34d;
-  --color-dark-bg: #1f2937;
-  --color-dark-panel: #374151;
-  --color-dark-nav: #111827;
-}
-
-@layer base {
-  :root {
-    --bg-main: #f3f4f6;
-    --bg-nav: #111827;
-    --bg-panel: #ffffff;
-    --text-primary: #111827;
-    --text-secondary: #4b5563;
-    --border-color: #e5e7eb;
-  }
-
-  .dark {
-    --bg-main: #1f2937;
-    --bg-nav: #030712;
-    --bg-panel: #374151;
-    --text-primary: #f9fafb;
-    --text-secondary: #9ca3af;
-    --border-color: #4b5563;
-  }
-
-  body {
-    background-color: var(--bg-main);
-    color: var(--text-primary);
-  }
-}
+:root { font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #202334; font-synthesis: none; text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; font-size: 13px; background: #303845; }
+* { box-sizing: border-box; }
+html, body, #root { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+button, input, textarea, select { font: inherit; }
+button, a, input, textarea, select { -webkit-tap-highlight-color: transparent; }
+button { cursor: pointer; border: 0; background: none; color: inherit; }
+button:disabled { cursor: not-allowed; opacity: .42; }
+button, a { touch-action: manipulation; }
+button, input, textarea, a, select, [tabindex] { outline-offset: 3px; }
+:focus-visible { outline: 2px solid #a48400; }
+input, textarea, select { color: inherit; min-width: 0; }
+input::placeholder, textarea::placeholder { color: #9697a4; }
+button svg, a svg { flex-shrink: 0; }
+a { color: inherit; text-decoration: none; }
+h1, h2, h3, h4, p { margin: 0; }
+button, a { -webkit-user-select: none; user-select: none; }
+[hidden] { display: none !important; }
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-thumb { background: #dcdde4; border-radius: 5px; }

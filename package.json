@@ -1,5 +1,5 @@
 {
-  "name": "iso-office-temp",
+  "name": "iso-office",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "typecheck": "tsc -b --pretty false",
+    "test": "node --import ./tests/register.mjs --test --test-concurrency=1 tests/*.test.tsx"
   },
   "dependencies": {
     "clsx": "^2.1.1",
@@ -20,15 +22,18 @@
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",
+    "@testing-library/react": "^16.3.0",
     "@types/node": "^24.13.3",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
     "@types/three": "^0.185.4",
     "@vitejs/plugin-react": "^6.1.0",
     "autoprefixer": "^10.5.4",
+    "jsdom": "^26.1.0",
     "oxlint": "^1.79.0",
     "postcss": "^8.5.26",
     "tailwindcss": "^4.3.3",
+    "tsx": "^4.20.6",
     "typescript": "~6.0.2",
     "vite": "^8.2.2"
   }

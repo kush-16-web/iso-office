@@ -1,80 +1,16 @@
-
-import { Mic, MicOff, Video, VideoOff, MonitorUp, Maximize, ChevronUp } from 'lucide-react';
-import { useStore } from './store';
-import clsx from 'clsx';
-
-const ControlButton = ({ icon, label, isActive, onClick, hasDropdown = true }: any) => (
-  <div className="flex flex-col items-center gap-1">
-    <div className="flex items-center">
-      <button
-        onClick={onClick}
-        className={clsx(
-          "w-10 h-10 rounded-full flex items-center justify-center transition-colors shadow-sm border border-[var(--border-color)]",
-          isActive ? "bg-white text-gray-800" : "bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
-        )}
-      >
-        {icon}
-      </button>
-      {hasDropdown && (
-        <button className="w-5 h-10 -ml-2 rounded-r-full flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors z-10">
-          <ChevronUp className="w-3 h-3" />
-        </button>
-      )}
-    </div>
-    <span className="text-[10px] font-medium text-[var(--text-secondary)]">{label}</span>
-  </div>
-);
-
-export const BottomBar = () => {
-  const {
-    activeRoom, coworkers,
-    isMuted, toggleMute,
-    isCameraOn, toggleCamera,
-    isScreenSharing, toggleScreenShare,
-    isFullscreen, toggleFullscreen
-  } = useStore();
-
-  const nearbyCount = coworkers.filter(c => c.isNearby).length;
-
-  return (
-    <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-[var(--bg-panel)] border border-[var(--border-color)] rounded-full px-6 py-2 shadow-xl z-20 flex items-center gap-6">
-
-      {/* Location Info */}
-      <div className="pr-6 border-r border-[var(--border-color)] flex flex-col">
-        <span className="font-semibold text-sm text-[var(--text-primary)]">{activeRoom}</span>
-        <span className="text-xs text-[var(--text-secondary)]">{nearbyCount} people around you</span>
-      </div>
-
-      {/* Controls */}
-      <div className="flex items-center gap-4">
-        <ControlButton
-          icon={isMuted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4 text-green-600" />}
-          label={isMuted ? "Unmute" : "Mute"}
-          isActive={!isMuted}
-          onClick={toggleMute}
-        />
-        <ControlButton
-          icon={isCameraOn ? <Video className="w-4 h-4 text-green-600" /> : <VideoOff className="w-4 h-4" />}
-          label={isCameraOn ? "Deactivate" : "Activate camera"}
-          isActive={isCameraOn}
-          onClick={toggleCamera}
-        />
-        <ControlButton
-          icon={<MonitorUp className={clsx("w-4 h-4", isScreenSharing && "text-blue-600")} />}
-          label="Share screen"
-          isActive={isScreenSharing}
-          onClick={toggleScreenShare}
-          hasDropdown={false}
-        />
-        <ControlButton
-          icon={<Maximize className={clsx("w-4 h-4", isFullscreen && "text-blue-600")} />}
-          label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
-          isActive={isFullscreen}
-          onClick={toggleFullscreen}
-          hasDropdown={false}
-        />
-      </div>
-
-    </div>
-  );
-};
+import { useEffect, useState } from 'react';
+import { Maximize, Mic, MicOff, Minimize, MonitorUp, PhoneOff, Video, VideoOff } from 'lucide-react';
+import { useStore, nearbyCount } from './store';
+export function BottomBar() {
+  const call = useStore(s => s.call), muted = useStore(s => s.isMuted), camera = useStore(s => s.isCameraOn), sharing = useStore(s => s.isScreenSharing);
+  const [fullscreen, setFullscreen] = useState(Boolean(document.fullscreenElement));
+  useEffect(() => { const update = () => setFullscreen(Boolean(document.fullscreenElement)); document.addEventListener('fullscreenchange', update); return () => document.removeEventListener('fullscreenchange', update); }, []);
+  const toggleFullscreen = async () => { try { if (document.fullscreenElement) await document.exitFullscreen(); else if (document.documentElement.requestFullscreen) await document.documentElement.requestFullscreen(); else useStore.getState().notify('Fullscreen isn’t available in this browser.'); } catch { useStore.getState().notify('Your browser couldn’t enter fullscreen.'); } };
+  const controls = [
+    { label: muted ? 'Unmute' : 'Mute', description: 'demo microphone', icon: muted ? MicOff : Mic, active: !muted, action: () => useStore.getState().toggleMedia('mic'), disabled: !call },
+    { label: camera ? 'Stop preview' : 'Start camera', description: 'demo camera', icon: camera ? Video : VideoOff, active: camera, action: () => useStore.getState().toggleMedia('camera'), disabled: !call },
+    { label: sharing ? 'Stop preview' : 'Share screen', description: 'demo screen sharing', icon: MonitorUp, active: sharing, action: () => useStore.getState().toggleMedia('screen'), disabled: !call },
+    { label: fullscreen ? 'Exit fullscreen' : 'Enter fullscreen', description: '', icon: fullscreen ? Minimize : Maximize, active: fullscreen, action: toggleFullscreen, disabled: false },
+  ];
+  return <div className="bottom-bar" aria-label="Office controls"><div className="space-info"><strong>{call?.name ?? 'Public space'}</strong><span>{nearbyCount()} people around you</span></div><div className="bottom-controls">{controls.map(({ label, description, icon: Icon, active, action, disabled }) => <button key={description || 'fullscreen'} className={`control-button ${active ? 'is-active' : ''}`} title={`${label} ${description}`.trim()} aria-label={`${label} ${description}`.trim()} aria-pressed={active} disabled={disabled} onClick={action}><span><Icon size={20}/></span><small>{label}</small></button>)}{call && <button className="leave-call" title="Leave demo call" aria-label="Leave demo call" onClick={() => useStore.getState().leaveCall()}><PhoneOff size={17}/></button>}</div></div>;
+}

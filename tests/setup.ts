@@ -1,0 +1,11 @@
+import { JSDOM } from 'jsdom';
+const dom = new JSDOM('<!doctype html><html><body></body></html>', { url: 'http://localhost/' });
+Object.defineProperty(globalThis, 'navigator', { configurable: true, value: dom.window.navigator });
+Object.assign(globalThis, { window: dom.window, document: dom.window.document, HTMLElement: dom.window.HTMLElement, Element: dom.window.Element, Node: dom.window.Node, File: dom.window.File, Event: dom.window.Event, MouseEvent: dom.window.MouseEvent, getComputedStyle: dom.window.getComputedStyle, IS_REACT_ACT_ENVIRONMENT: true });
+Object.defineProperty(dom.window, 'PointerEvent', { value: dom.window.MouseEvent });
+dom.window.HTMLElement.prototype.setPointerCapture = () => {};
+dom.window.HTMLElement.prototype.releasePointerCapture = () => {};
+let objectId = 0;
+URL.createObjectURL = () => `blob:http://localhost/demo-${++objectId}`;
+URL.revokeObjectURL = () => {};
+Object.defineProperty(dom.window.navigator, 'mediaDevices', { value: { getUserMedia: () => { throw new Error('A demo must never capture media'); }, getDisplayMedia: () => { throw new Error('A demo must never capture the screen'); } } });

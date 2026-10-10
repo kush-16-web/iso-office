@@ -1,62 +1,17 @@
-
+import { LocateFixed, Minus, Plus } from 'lucide-react';
 import { useStore } from './store';
-
-export const Minimap = () => {
-  const { coworkers,   } = useStore();
-
-  // Basic 2D representation mapping 3D coordinates to a 2D canvas
-  // Assuming a rough mapping of -16 to 16 in 3D -> 0 to 100% in 2D
-
-  const mapCoord = (val: number, range: number = 32) => {
-    return `${((val + (range/2)) / range) * 100}%`;
-  };
-
-  return (
-    <div className="absolute bottom-4 left-4 w-48 h-32 bg-[var(--bg-panel)] border border-[var(--border-color)] rounded z-10 p-2 shadow-lg">
-      <div className="w-full h-full relative bg-gray-100 dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 overflow-hidden">
-
-        {/* Floor Plan (Approximate 2D version) */}
-        {/* Main Blue */}
-        <div className="absolute inset-0 bg-blue-100/50 dark:bg-blue-900/30"></div>
-        {/* Meeting Rooms (Left side approx) */}
-        <div className="absolute top-0 left-0 w-1/3 h-full bg-gray-200/50 dark:bg-gray-700/50 border-r border-gray-300 dark:border-gray-600"></div>
-        {/* Library (Bottom approx) */}
-        <div className="absolute bottom-0 left-1/3 right-0 h-1/2 bg-yellow-100/50 dark:bg-yellow-900/30 border-t border-gray-300 dark:border-gray-600"></div>
-
-        {/* Current User */}
-        <div
-          className="absolute w-2 h-2 bg-gray-800 dark:bg-gray-200 rounded-full ring-2 ring-white transform -translate-x-1/2 -translate-y-1/2 z-10"
-          style={{ left: mapCoord(2), top: mapCoord(2) }}
-        />
-
-        {/* Proximity Ring (Approximate) */}
-         <div
-          className="absolute w-8 h-8 rounded-full border border-blue-400/50 bg-blue-400/20 transform -translate-x-1/2 -translate-y-1/2"
-          style={{ left: mapCoord(2), top: mapCoord(2) }}
-        />
-
-        {/* Coworkers */}
-        {coworkers.map((c, i) => {
-           // Mock positions matching 3D space
-           const pos = [
-             { x: 0, z: -2 },
-             { x: 4, z: 3 },
-             { x: -2, z: 5 },
-             { x: -12, z: 2 },
-             { x: -12, z: -2 }
-           ][i] || { x: 0, z: 0 };
-
-           const color = c.status === 'online' ? 'bg-green-500' : c.status === 'in-call' ? 'bg-blue-500' : 'bg-gray-400';
-
-           return (
-            <div
-              key={c.id}
-              className={`absolute w-1.5 h-1.5 ${color} rounded-full transform -translate-x-1/2 -translate-y-1/2`}
-              style={{ left: mapCoord(pos.x), top: mapCoord(pos.z) }}
-            />
-           )
-        })}
-      </div>
-    </div>
-  );
-};
+import { users } from './data';
+import { WORLD_FLOORS, WORLD_POSITIONS, WORLD_BOUNDS, mapToWorld, worldToMap } from './world';
+import { IconButton } from './components/IconButton';
+export function Minimap() {
+  const camera = useStore(s => s.camera), footprint = useStore(s => s.cameraFootprint);
+  const span = WORLD_BOUNDS.max - WORLD_BOUNDS.min;
+  return <section className="minimap" aria-label="Office minimap"><h2>Minimap</h2><svg viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-label="Office floor plan. Select a coworker to center the camera." onClick={event => { const rect = event.currentTarget.getBoundingClientRect(); useStore.getState().focusWorld({ x: mapToWorld((event.clientX - rect.left) / rect.width * 100), z: mapToWorld((event.clientY - rect.top) / rect.height * 100) }); }}>
+    <rect width="100" height="100" fill="#202a34"/>
+    {WORLD_FLOORS.map(floor => <rect key={floor.id} x={worldToMap(floor.x - floor.width / 2)} y={worldToMap(floor.z - floor.depth / 2)} width={floor.width / span * 100} height={floor.depth / span * 100} fill={floor.color} fillOpacity=".22" stroke="#d3e0e6" strokeOpacity=".35" strokeWidth=".6"/>)}
+    {[2, -2].map(x => <rect key={x} x={worldToMap(x - 1)} y={worldToMap(-15.25)} width={2 / span * 100} height={.5 / span * 100} fill="#f9bf55"/>)}
+    {[[2, 2.5], [0, -1.5], [4.5, 3], [-2.5, 5], [-12, 2], [-12, -4]].map(([x, z], i) => <rect key={i} x={worldToMap(x - 1)} y={worldToMap(z - .5)} width={2 / span * 100} height={1 / span * 100} rx=".3" fill="#e2edf4" fillOpacity=".6"/>)}
+    <polygon className="minimap-viewport" points={footprint.map(point => `${worldToMap(point.x)},${worldToMap(point.z)}`).join(' ')} fill="white" fillOpacity=".025" stroke="#fff" strokeWidth=".75"/>
+    {users.map(user => { const point = WORLD_POSITIONS[user.id]; return <g key={user.id} className="map-person" role="button" tabIndex={0} aria-label={`Center camera on ${user.name}`} onClick={event => { event.stopPropagation(); useStore.getState().focusWorld(point); }} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); useStore.getState().focusWorld(point); } }}><circle cx={worldToMap(point.x)} cy={worldToMap(point.z)} r="3.2" fill="transparent"/><circle cx={worldToMap(point.x)} cy={worldToMap(point.z)} r={user.id === 'me' ? 1.8 : 1.2} fill={user.id === 'me' ? '#ffd20a' : user.status === 'offline' ? '#7b8290' : '#b8eddb'} stroke={user.id === 'me' ? '#fff3a0' : '#17222d'} strokeWidth=".45"/></g>; })}
+  </svg><div className="map-controls"><IconButton label="Zoom in office" disabled={camera.zoom >= 2.4} onClick={() => useStore.getState().focusWorld(camera.target, camera.zoom + .2)}><Plus size={21}/></IconButton><IconButton label="Zoom out office" disabled={camera.zoom <= .65} onClick={() => useStore.getState().focusWorld(camera.target, camera.zoom - .2)}><Minus size={21}/></IconButton><IconButton label="Reset office camera" onClick={() => useStore.getState().focusWorld({ x: -3, z: -3 }, 1)}><LocateFixed size={19}/></IconButton></div><small>You <i/> · Click to look around</small></section>;
+}

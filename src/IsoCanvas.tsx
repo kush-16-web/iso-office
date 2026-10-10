@@ -1,359 +1,182 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
-import { useStore, type User } from './store';
-import { ProfileCard } from './ProfileCard';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { useStore } from './store';
+import { users } from './data';
+import { clampWorldPoint, WORLD_FLOORS, WORLD_POSITIONS } from './world';
 
-export const IsoCanvas = () => {
+// Pass 1 preserves the prototype's floors, desks, tables, bookshelves and character
+// geometry. The reference's detailed architecture and rigged humans belong to Pass 2.
+export function IsoCanvas() {
   const containerRef = useRef<HTMLDivElement>(null);
-  const { coworkers, currentUser } = useStore();
-
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [cardPosition, setCardPosition] = useState({ x: 0, y: 0 });
-
   useEffect(() => {
-    if (!containerRef.current) return;
-
-    // --- Scene Setup ---
+    const container = containerRef.current;
+    if (!container) return;
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xf3f4f6); // Match bg-main
-
-    // --- Isometric Camera Setup ---
-    const aspect = containerRef.current.clientWidth / containerRef.current.clientHeight;
-    const d = 15;
-    const camera = new THREE.OrthographicCamera(-d * aspect, d * aspect, d, -d, 1, 1000);
-
-    // Isometric angle: 45 deg Y, ~35.264 deg X
-    camera.position.set(20, 20, 20);
-    camera.lookAt(scene.position);
-
-    // --- Renderer Setup ---
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setSize(containerRef.current.clientWidth, containerRef.current.clientHeight);
+    scene.background = new THREE.Color('#303845');
+    let renderer: THREE.WebGLRenderer;
+    try { renderer = new THREE.WebGLRenderer({ antialias: true }); }
+    catch { useStore.getState().setSceneState('unavailable'); return; }
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    containerRef.current.appendChild(renderer.domElement);
-
-    // --- Lighting ---
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
-    scene.add(ambientLight);
-
-    const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    dirLight.position.set(10, 20, 10);
-    dirLight.castShadow = true;
-    dirLight.shadow.mapSize.width = 2048;
-    dirLight.shadow.mapSize.height = 2048;
-    dirLight.shadow.camera.left = -20;
-    dirLight.shadow.camera.right = 20;
-    dirLight.shadow.camera.top = 20;
-    dirLight.shadow.camera.bottom = -20;
-    scene.add(dirLight);
-
-    // --- Environment / Floors ---
+    renderer.domElement.setAttribute('aria-label', '3D office. Drag to pan, scroll to zoom, or select a coworker. Arrow keys pan the camera.');
+    renderer.domElement.setAttribute('role', 'application');
+    renderer.domElement.tabIndex = 0;
+    container.appendChild(renderer.domElement);
+    const d = 15;
+    const camera = new THREE.OrthographicCamera(-d, d, d, -d, .1, 300);
+    const initial = useStore.getState().camera;
+    camera.position.set(initial.target.x + 24, 24, initial.target.z + 24);
+    camera.zoom = initial.zoom;
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.set(initial.target.x, 0, initial.target.z);
+    controls.enableRotate = false;
+    controls.screenSpacePanning = false;
+    controls.minZoom = .65; controls.maxZoom = 2.4;
+    controls.mouseButtons.LEFT = THREE.MOUSE.PAN;
+    controls.mouseButtons.RIGHT = THREE.MOUSE.PAN;
+    controls.touches.ONE = THREE.TOUCH.PAN;
+    controls.touches.TWO = THREE.TOUCH.DOLLY_PAN;
+    controls.update();
+    scene.add(new THREE.AmbientLight(0xffffff, 1.5));
+    const sun = new THREE.DirectionalLight(0xfff4df, 2.2);
+    sun.position.set(-5, 24, 12); sun.castShadow = true;
+    sun.shadow.mapSize.set(2048, 2048);
+    Object.assign(sun.shadow.camera, { left: -24, right: 24, top: 24, bottom: -24 });
+    sun.shadow.normalBias = .035;
+    scene.add(sun);
     const floorGroup = new THREE.Group();
-
-    // Zone 1: Central Open Space (Blue)
-    const geoOpen = new THREE.BoxGeometry(16, 0.5, 16);
-    const matOpen = new THREE.MeshStandardMaterial({ color: 0x93c5fd });
-    const meshOpen = new THREE.Mesh(geoOpen, matOpen);
-    meshOpen.position.set(0, -0.25, 0);
-    meshOpen.receiveShadow = true;
-    floorGroup.add(meshOpen);
-
-    // Zone 2: Meeting Rooms (Gray/White)
-    const geoMeeting = new THREE.BoxGeometry(8, 0.5, 16);
-    const matMeeting = new THREE.MeshStandardMaterial({ color: 0xe5e7eb });
-    const meshMeeting = new THREE.Mesh(geoMeeting, matMeeting);
-    meshMeeting.position.set(-12, -0.25, 0);
-    meshMeeting.receiveShadow = true;
-    floorGroup.add(meshMeeting);
-
-    // Zone 3: Lounge / Library (Amber)
-    const geoLounge = new THREE.BoxGeometry(16, 0.5, 8);
-    const matLounge = new THREE.MeshStandardMaterial({ color: 0xfcd34d });
-    const meshLounge = new THREE.Mesh(geoLounge, matLounge);
-    meshLounge.position.set(0, -0.25, -12);
-    meshLounge.receiveShadow = true;
-    floorGroup.add(meshLounge);
-
-    // Furniture
-    const createDesk = (x: number, z: number, rotationY: number = 0) => {
-      const deskGroup = new THREE.Group();
-      deskGroup.position.set(x, 0, z);
-      deskGroup.rotation.y = rotationY;
-
-      const topGeo = new THREE.BoxGeometry(2, 0.1, 1);
-      const topMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
-      const top = new THREE.Mesh(topGeo, topMat);
-      top.position.y = 0.8;
-      top.castShadow = true;
-      top.receiveShadow = true;
-      deskGroup.add(top);
-
-      const legGeo = new THREE.BoxGeometry(0.1, 0.8, 0.1);
-      const legMat = new THREE.MeshStandardMaterial({ color: 0x9ca3af });
-
-      const leg1 = new THREE.Mesh(legGeo, legMat); leg1.position.set(-0.9, 0.4, -0.4); leg1.castShadow = true; deskGroup.add(leg1);
-      const leg2 = new THREE.Mesh(legGeo, legMat); leg2.position.set(0.9, 0.4, -0.4); leg2.castShadow = true; deskGroup.add(leg2);
-      const leg3 = new THREE.Mesh(legGeo, legMat); leg3.position.set(-0.9, 0.4, 0.4); leg3.castShadow = true; deskGroup.add(leg3);
-      const leg4 = new THREE.Mesh(legGeo, legMat); leg4.position.set(0.9, 0.4, 0.4); leg4.castShadow = true; deskGroup.add(leg4);
-
-      return deskGroup;
+    for (const floor of WORLD_FLOORS) {
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(floor.width, .5, floor.depth), new THREE.MeshStandardMaterial({ color: floor.color, roughness: .9 }));
+      mesh.position.set(floor.x, -.25, floor.z); mesh.receiveShadow = true; floorGroup.add(mesh);
+    }
+    const deskTopGeometry = new THREE.BoxGeometry(2, .1, 1);
+    const deskLegGeometry = new THREE.BoxGeometry(.1, .8, .1);
+    const deskMaterial = new THREE.MeshStandardMaterial({ color: '#f8fafb' });
+    const metalMaterial = new THREE.MeshStandardMaterial({ color: '#8995a5', roughness: .55 });
+    const createDesk = (x: number, z: number, rotation = 0) => {
+      const group = new THREE.Group(); group.position.set(x, 0, z); group.rotation.y = rotation;
+      const top = new THREE.Mesh(deskTopGeometry, deskMaterial); top.position.y = .8; top.castShadow = true; top.receiveShadow = true; group.add(top);
+      for (const lx of [-.9, .9]) for (const lz of [-.4, .4]) { const leg = new THREE.Mesh(deskLegGeometry, metalMaterial); leg.position.set(lx, .4, lz); leg.castShadow = true; group.add(leg); }
+      return group;
     };
-
-    floorGroup.add(createDesk(2, 2.5));
-    floorGroup.add(createDesk(0, -1.5));
-    floorGroup.add(createDesk(4.5, 3, Math.PI / 2));
-    floorGroup.add(createDesk(-2.5, 5, Math.PI / 2));
-
-    const createMeetingTable = (x: number, z: number) => {
-      const tableGroup = new THREE.Group();
-      tableGroup.position.set(x, 0, z);
-
-      const topGeo = new THREE.BoxGeometry(3, 0.1, 1.5);
-      const topMat = new THREE.MeshStandardMaterial({ color: 0xd1d5db });
-      const top = new THREE.Mesh(topGeo, topMat);
-      top.position.y = 0.8;
-      top.castShadow = true;
-      top.receiveShadow = true;
-      tableGroup.add(top);
-
-      const baseGeo = new THREE.CylinderGeometry(0.3, 0.4, 0.8, 16);
-      const baseMat = new THREE.MeshStandardMaterial({ color: 0x4b5563 });
-      const base = new THREE.Mesh(baseGeo, baseMat);
-      base.position.y = 0.4;
-      base.castShadow = true;
-      tableGroup.add(base);
-
-      return tableGroup;
-    };
-
-    floorGroup.add(createMeetingTable(-12, 2));
-    floorGroup.add(createMeetingTable(-12, -4));
-
-    const createBookshelf = (x: number, z: number, rotationY: number) => {
-      const shelfGroup = new THREE.Group();
-      shelfGroup.position.set(x, 0, z);
-      shelfGroup.rotation.y = rotationY;
-
-      const geo = new THREE.BoxGeometry(2, 3, 0.5);
-      const mat = new THREE.MeshStandardMaterial({ color: 0xd97706 });
-      const mesh = new THREE.Mesh(geo, mat);
-      mesh.position.y = 1.5;
-      mesh.castShadow = true;
-      mesh.receiveShadow = true;
-      shelfGroup.add(mesh);
-      return shelfGroup;
-    };
-
-    floorGroup.add(createBookshelf(2, -15, 0));
-    floorGroup.add(createBookshelf(-2, -15, 0));
-
+    floorGroup.add(createDesk(2, 2.5), createDesk(0, -1.5), createDesk(4.5, 3, Math.PI / 2), createDesk(-2.5, 5, Math.PI / 2));
+    const tableGeometry = new THREE.BoxGeometry(3, .1, 1.5), baseGeometry = new THREE.CylinderGeometry(.3, .4, .8, 16);
+    for (const z of [2, -4]) {
+      const group = new THREE.Group(); group.position.set(-12, 0, z);
+      const top = new THREE.Mesh(tableGeometry, deskMaterial); top.position.y = .8; top.castShadow = true; group.add(top);
+      const base = new THREE.Mesh(baseGeometry, metalMaterial); base.position.y = .4; base.castShadow = true; group.add(base); floorGroup.add(group);
+    }
+    const shelfGeometry = new THREE.BoxGeometry(2, 3, .5), shelfMaterial = new THREE.MeshStandardMaterial({ color: '#d97706' });
+    for (const x of [-2, 2]) { const shelf = new THREE.Mesh(shelfGeometry, shelfMaterial); shelf.position.set(x, 1.5, -15); shelf.castShadow = true; floorGroup.add(shelf); }
     scene.add(floorGroup);
-
-    // Walls for Meeting Rooms (Glass)
-    const wallGeo = new THREE.BoxGeometry(8, 2, 0.2);
-    const glassMat = new THREE.MeshPhysicalMaterial({
-      color: 0xffffff, transparent: true, opacity: 0.3, roughness: 0.1, transmission: 0.9
-    });
-    const wall1 = new THREE.Mesh(wallGeo, glassMat);
-    wall1.position.set(-12, 1, 8);
-    scene.add(wall1);
-
-    // --- Characters ---
+    const glass = new THREE.Mesh(new THREE.BoxGeometry(8, 2, .2), new THREE.MeshPhysicalMaterial({ color: '#dcebf3', transparent: true, opacity: .3, roughness: .1, transmission: .5 }));
+    glass.position.set(-12, 1, 8); scene.add(glass);
+    const bodyGeometry = new THREE.CapsuleGeometry(.3, .5, 4, 8), headGeometry = new THREE.SphereGeometry(.25, 16, 16), statusGeometry = new THREE.SphereGeometry(.09, 8, 8);
     const characters: THREE.Group[] = [];
-    const animatables: { mesh: THREE.Group, offset: number }[] = [];
-    const bodyGeo = new THREE.CapsuleGeometry(0.3, 0.5, 4, 8);
-    const headGeo = new THREE.SphereGeometry(0.25, 16, 16);
-
-    const createCharacter = (user: User, x: number, z: number, color: number, pose: 'idle' | 'working' | 'meeting' = 'idle') => {
-      const charGroup = new THREE.Group();
-
-      const mat = new THREE.MeshStandardMaterial({ color });
-      const body = new THREE.Mesh(bodyGeo, mat);
-      body.castShadow = true;
-
-      const head = new THREE.Mesh(headGeo, new THREE.MeshStandardMaterial({ color: 0xffccaa }));
-      head.position.y = 0.65;
-      head.castShadow = true;
-
-      charGroup.add(body);
-      charGroup.add(head);
-
-      // Posturing
-      if (pose === 'working') {
-        // Sitting lower, slightly leaned forward
-        charGroup.position.set(x, 0.4, z);
-        body.rotation.x = 0.1;
-      } else {
-        // Standing
-        charGroup.position.set(x, 0.6, z);
-      }
-
-      charGroup.userData = { user }; // Store user data for raycasting
-
-      // Status dot
-      const statusColor = user.status === 'online' ? 0x22c55e : user.status === 'in-call' ? 0x3b82f6 : 0x9ca3af;
-      const dotGeo = new THREE.SphereGeometry(0.1);
-      const dotMat = new THREE.MeshBasicMaterial({ color: statusColor });
-      const dot = new THREE.Mesh(dotGeo, dotMat);
-      dot.position.set(0, 1.2, 0); // Above head
-      charGroup.add(dot);
-
-      scene.add(charGroup);
-      characters.push(charGroup);
-      animatables.push({ mesh: charGroup, offset: Math.random() * Math.PI * 2 });
-      return charGroup;
+    users.forEach((user, i) => {
+      const position = WORLD_POSITIONS[user.id], group = new THREE.Group();
+      const body = new THREE.Mesh(bodyGeometry, new THREE.MeshStandardMaterial({ color: user.portrait.shirt })); body.castShadow = true;
+      const head = new THREE.Mesh(headGeometry, new THREE.MeshStandardMaterial({ color: user.portrait.skin })); head.position.y = .65; head.castShadow = true;
+      const status = new THREE.Mesh(statusGeometry, new THREE.MeshBasicMaterial({ color: user.status === 'online' ? '#00a77b' : user.status === 'in-call' ? '#418bed' : '#a3a7ad' })); status.position.y = 1.15;
+      group.add(body, head, status); group.position.set(position.x, .6, position.z);
+      group.userData = { userId: user.id, offset: i * 1.2 };
+      scene.add(group); characters.push(group);
+    });
+    const ring = new THREE.Mesh(new THREE.RingGeometry(4, 4.08, 48), new THREE.MeshBasicMaterial({ color: '#dce7f6', transparent: true, opacity: .3, side: THREE.DoubleSide }));
+    ring.rotation.x = -Math.PI / 2; ring.position.set(WORLD_POSITIONS.me.x, .015, WORLD_POSITIONS.me.z); scene.add(ring);
+    const raycaster = new THREE.Raycaster(), mouse = new THREE.Vector2(), ground = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+    const projected = new THREE.Vector3();
+    const projectProfile = (userId: string) => {
+      const character = characters.find(mesh => mesh.userData.userId === userId);
+      if (!character) return null;
+      character.getWorldPosition(projected); projected.y += 1.2; projected.project(camera);
+      return { x: (projected.x * .5 + .5) * container.clientWidth + 18, y: (projected.y * -.5 + .5) * container.clientHeight - 185 };
     };
-
-    // Current User
-    const meMesh = createCharacter(currentUser, 2, 2, 0x1f2937, 'working'); // Dark gray, at desk
-
-    // Proximity Ring (around current user)
-    const ringGeo = new THREE.RingGeometry(4, 4.2, 32);
-    const ringMat = new THREE.MeshBasicMaterial({ color: 0x94a3b8, transparent: true, opacity: 0.3, side: THREE.DoubleSide });
-    const proximityRing = new THREE.Mesh(ringGeo, ringMat);
-    proximityRing.rotation.x = -Math.PI / 2;
-    proximityRing.position.y = -0.3; // Offset to match sitting height
-    meMesh.add(proximityRing); // Attach to player
-
-    // Clustering logic for meeting rooms
-    const clusterCharacters = (users: User[], centerX: number, centerZ: number, radius: number) => {
-      users.forEach((user, index) => {
-        const angle = (index / users.length) * Math.PI * 2;
-        const x = centerX + Math.cos(angle) * radius;
-        const z = centerZ + Math.sin(angle) * radius;
-        // Determine color based on user index or fixed colors for demo
-        const colors = [0xf59e0b, 0x8b5cf6, 0xec4899, 0x06b6d4];
-        const color = colors[index % colors.length];
-        const charMesh = createCharacter(user, x, z, color, 'meeting');
-        // Face the center of the table
-        charMesh.lookAt(centerX, charMesh.position.y, centerZ);
+    const updateProfile = () => {
+      const selection = useStore.getState().selectedProfile;
+      if (!selection?.anchored) return;
+      const point = projectProfile(selection.userId);
+      if (point && (Math.abs(point.x - selection.x) > .5 || Math.abs(point.y - selection.y) > .5)) useStore.getState().moveProfile(point);
+    };
+    const updateFootprint = () => {
+      camera.updateMatrixWorld();
+      const points = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([x, y]) => {
+        raycaster.setFromCamera(new THREE.Vector2(x, y), camera);
+        const hit = raycaster.ray.intersectPlane(ground, new THREE.Vector3());
+        return { x: hit?.x ?? 0, z: hit?.z ?? 0 };
       });
+      useStore.getState().setCameraFootprint(points); updateProfile();
     };
-
-    // Coworkers (working at desks)
-    createCharacter(coworkers[0], 0, -1.5, 0xef4444, 'working'); // Red
-    createCharacter(coworkers[1], 4.5, 3, 0x3b82f6, 'working'); // Blue
-    createCharacter(coworkers[2], -2.5, 5, 0x10b981, 'working'); // Green
-
-    // Coworkers (clustered in meeting room)
-    const meetingUsers = [coworkers[3], coworkers[4]];
-    clusterCharacters(meetingUsers, -12, 2, 1.5);
-
-    // --- Raycaster Setup ---
-    const raycaster = new THREE.Raycaster();
-    const mouse = new THREE.Vector2();
-
-    const onMouseClick = (event: MouseEvent) => {
+    let syncing = false;
+    const onControlChange = () => {
+      if (syncing) return;
+      const point = clampWorldPoint({ x: controls.target.x, z: controls.target.z });
+      const dx = point.x - controls.target.x, dz = point.z - controls.target.z;
+      camera.position.x += dx; camera.position.z += dz; controls.target.set(point.x, 0, point.z);
+      useStore.setState(state => ({ camera: { target: point, zoom: camera.zoom, revision: state.camera.revision } }));
+      updateFootprint();
+    };
+    controls.addEventListener('change', onControlChange);
+    const unsubscribe = useStore.subscribe((state, previous) => {
+      if (state.camera.revision !== previous.camera.revision) {
+        syncing = true;
+        const dx = state.camera.target.x - controls.target.x, dz = state.camera.target.z - controls.target.z;
+        camera.position.x += dx; camera.position.z += dz;
+        controls.target.set(state.camera.target.x, 0, state.camera.target.z); camera.zoom = state.camera.zoom; camera.updateProjectionMatrix(); controls.update(); syncing = false;
+        updateFootprint();
+      }
+    });
+    let pointerStart = { x: 0, y: 0 };
+    const onPointerDown = (event: PointerEvent) => { pointerStart = { x: event.clientX, y: event.clientY }; };
+    const onClick = (event: MouseEvent) => {
+      if (Math.hypot(event.clientX - pointerStart.x, event.clientY - pointerStart.y) > 5) return;
       const rect = renderer.domElement.getBoundingClientRect();
-      mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-      mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-
+      mouse.set((event.clientX - rect.left) / rect.width * 2 - 1, -(event.clientY - rect.top) / rect.height * 2 + 1);
       raycaster.setFromCamera(mouse, camera);
-
-      // Intersect characters
-      const intersects = raycaster.intersectObjects(characters, false);
-
-      if (intersects.length > 0) {
-        const clickedMesh = intersects[0].object as THREE.Mesh;
-        const user = clickedMesh.userData.user as User;
-
-        setSelectedUser(user);
-
-        // Calculate 2D position for the HTML card
-        const vec = new THREE.Vector3();
-        clickedMesh.getWorldPosition(vec);
-        vec.y += 1.5; // Offset above head
-        vec.project(camera);
-
-        const x = (vec.x * .5 + .5) * rect.width;
-        const y = (vec.y * -.5 + .5) * rect.height;
-
-        setCardPosition({ x, y });
-      } else {
-        setSelectedUser(null);
-      }
+      // Groups do not raycast themselves. Recurse into meshes and walk to the user group.
+      let picked: THREE.Object3D | null = raycaster.intersectObjects(characters, true)[0]?.object ?? null;
+      while (picked && !picked.userData.userId) picked = picked.parent;
+      if (picked?.userData.userId) { const point = projectProfile(picked.userData.userId); useStore.getState().selectProfile(picked.userData.userId, point ?? undefined); }
+      else useStore.getState().selectProfile(null);
     };
-
-    renderer.domElement.addEventListener('click', onMouseClick);
-    // Use pointer down/up logic later if we want to drag camera
-
-    // --- Animation Loop ---
-    let animationFrameId: number;
+    const onKey = (event: KeyboardEvent) => {
+      const state = useStore.getState(), point = state.camera.target;
+      if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) { event.preventDefault(); state.focusWorld({ x: point.x + (event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0), z: point.z + (event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : 0) }); }
+      if (event.key === '+' || event.key === '-') { event.preventDefault(); state.focusWorld(point, state.camera.zoom + (event.key === '+' ? .2 : -.2)); }
+    };
+    const onContextLost = (event: Event) => { event.preventDefault(); useStore.getState().setSceneState('unavailable'); };
+    renderer.domElement.addEventListener('pointerdown', onPointerDown);
+    renderer.domElement.addEventListener('click', onClick);
+    renderer.domElement.addEventListener('keydown', onKey);
+    renderer.domElement.addEventListener('webglcontextlost', onContextLost);
+    const resize = () => {
+      const width = Math.max(1, container.clientWidth), height = Math.max(1, container.clientHeight), aspect = width / height;
+      camera.left = -d * aspect; camera.right = d * aspect; camera.top = d; camera.bottom = -d; camera.updateProjectionMatrix();
+      renderer.setSize(width, height); updateFootprint();
+    };
+    const observer = new ResizeObserver(resize); observer.observe(container); resize();
+    let frame = 0;
     const animate = () => {
-      animationFrameId = requestAnimationFrame(animate);
-
-      const time = performance.now() * 0.001;
-
-      // Subtle idle bobbing animation
-      animatables.forEach((anim) => {
-        // Adjust the bobbing magnitude slightly based on pose
-        const magnitude = anim.mesh.position.y > 0.5 ? 0.05 : 0.02; // standing vs sitting
-        const baseY = anim.mesh.position.y > 0.5 ? 0.6 : 0.4;
-        anim.mesh.position.y = baseY + Math.sin(time * 2 + anim.offset) * magnitude;
-      });
-
-      // Update card position if a user is selected (in case we add camera panning later)
-      if (selectedUser) {
-        const selectedMesh = characters.find(c => c.userData.user.id === selectedUser.id);
-        if (selectedMesh) {
-          const vec = new THREE.Vector3();
-          selectedMesh.getWorldPosition(vec);
-          vec.y += 1.5;
-          vec.project(camera);
-          const rect = renderer.domElement.getBoundingClientRect();
-          setCardPosition({
-            x: (vec.x * .5 + .5) * rect.width,
-            y: (vec.y * -.5 + .5) * rect.height
-          });
-        }
-      }
-
+      frame = requestAnimationFrame(animate);
+      if (document.hidden) return;
+      const time = performance.now() * .001;
+      characters.forEach(character => { character.position.y = .6 + Math.sin(time * 2 + character.userData.offset) * .02; });
       renderer.render(scene, camera);
     };
-    animate();
-
-    // --- Resize Handler ---
-    const handleResize = () => {
-      if (!containerRef.current) return;
-      const width = containerRef.current.clientWidth;
-      const height = containerRef.current.clientHeight;
-      const newAspect = width / height;
-
-      camera.left = -d * newAspect;
-      camera.right = d * newAspect;
-      camera.top = d;
-      camera.bottom = -d;
-      camera.updateProjectionMatrix();
-
-      renderer.setSize(width, height);
-    };
-    window.addEventListener('resize', handleResize);
-
-    // --- Cleanup ---
-    const currentContainer = containerRef.current;
-    const currentRenderer = renderer;
+    animate(); useStore.getState().setSceneState('ready');
     return () => {
-      window.removeEventListener('resize', handleResize);
-      currentRenderer.domElement.removeEventListener('click', onMouseClick);
-      cancelAnimationFrame(animationFrameId);
-      if (currentContainer && currentContainer.contains(currentRenderer.domElement)) {
-        currentContainer.removeChild(currentRenderer.domElement);
-      }
-      currentRenderer.dispose();
-      // Need a more thorough dispose function in production
+      cancelAnimationFrame(frame); observer.disconnect(); unsubscribe(); controls.dispose();
+      renderer.domElement.removeEventListener('pointerdown', onPointerDown);
+      renderer.domElement.removeEventListener('click', onClick);
+      renderer.domElement.removeEventListener('keydown', onKey);
+      renderer.domElement.removeEventListener('webglcontextlost', onContextLost);
+      const geometries = new Set<THREE.BufferGeometry>(), materials = new Set<THREE.Material>();
+      scene.traverse(object => { if (object instanceof THREE.Mesh) { geometries.add(object.geometry); (Array.isArray(object.material) ? object.material : [object.material]).forEach(material => materials.add(material)); } });
+      geometries.forEach(geometry => geometry.dispose()); materials.forEach(material => material.dispose());
+      sun.shadow.map?.dispose(); renderer.dispose(); renderer.domElement.remove();
     };
-  }, [selectedUser, currentUser, coworkers]); // dependency on selectedUser so closure has it for resize/clicks
-
-  return (
-    <div className="w-full h-full relative" ref={containerRef}>
-      {selectedUser && (
-        <ProfileCard
-          user={selectedUser}
-          position={cardPosition}
-          onClose={() => setSelectedUser(null)}
-        />
-      )}
-    </div>
-  );
-};
+  }, []);
+  return <div className="iso-canvas" ref={containerRef}/>;
+}

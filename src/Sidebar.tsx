@@ -1,105 +1,60 @@
 import { useState } from 'react';
-import { Settings, ChevronsLeft, Globe, MapPin, Search, MessageSquare } from 'lucide-react';
-import { useStore, type User } from './store';
-import clsx from 'clsx';
+import { Settings, SlidersHorizontal, Hash, Plus, MessageSquare, Volume2, LockKeyhole, ChevronDown, ChevronRight, Check, Gift, PanelLeftClose, Search } from 'lucide-react';
+import { useStore } from './store';
+import { Avatar } from './components/Avatar';
+import { IconButton } from './components/IconButton';
 
-export const Sidebar = () => {
-  const { currentUser, coworkers } = useStore();
-  const [searchQuery, setSearchQuery] = useState('');
-
-  const filteredCoworkers = coworkers.filter(c => c.name.toLowerCase().includes(searchQuery.toLowerCase()));
-
-  const StatusDot = ({ status }: { status: User['status'] }) => {
-    const colors = {
-      'online': 'bg-green-500',
-      'in-call': 'bg-blue-500',
-      'offline': 'bg-gray-400'
-    };
-    return (
-      <div className={clsx("w-3 h-3 rounded-full border-2 border-white absolute bottom-0 right-0", colors[status])} />
-    );
-  };
-
-  return (
-    <div className="w-64 h-full bg-[var(--bg-panel)] border-r border-[var(--border-color)] flex flex-col shrink-0 z-10">
-      {/* Current User Card */}
-      <div className="p-4 flex items-center justify-between border-b border-[var(--border-color)]">
-        <div className="flex items-center gap-3">
-          <img src={currentUser.avatar} alt="You" className="w-10 h-10 rounded-full" />
-          <span className="font-medium">{currentUser.name}</span>
-        </div>
-        <div className="flex gap-1 text-[var(--text-secondary)]">
-          <button className="p-1 hover:text-[var(--text-primary)] transition-colors"><Settings className="w-4 h-4" /></button>
-          <button className="p-1 hover:text-[var(--text-primary)] transition-colors"><ChevronsLeft className="w-4 h-4" /></button>
-        </div>
+export function Sidebar() {
+  const currentUser = useStore(s => s.currentUser), coworkers = useStore(s => s.coworkers);
+  const channels = useStore(s => s.channels), office = useStore(s => s.office);
+  const open = useStore(s => s.sidebarOpen);
+  const activeChannel = useStore(s => s.windows.filter(w => w.kind === 'channel' && w.mode !== 'minimized').sort((a, b) => b.z - a.z)[0]?.targetId);
+  const [officeMenu, setOfficeMenu] = useState(false), [channelForm, setChannelForm] = useState(false);
+  const [channelName, setChannelName] = useState(''), [error, setError] = useState('');
+  const [searchVisible, setSearchVisible] = useState(false), [query, setQuery] = useState('');
+  return <>
+    {open && <button className="sidebar-scrim" aria-label="Close sidebar" onClick={() => useStore.getState().setSidebarOpen(false)}/>}
+    <aside className={`sidebar ${open ? 'is-open' : ''}`} aria-label="Office sidebar">
+      <header className="sidebar-profile">
+        <button className="identity-button" onClick={() => setOfficeMenu(!officeMenu)} aria-expanded={officeMenu} aria-label="Switch office">
+          <Avatar user={currentUser} size={38}/><span><strong>{currentUser.name}</strong><small>@markverona <ChevronDown size={11}/></small></span>
+        </button>
+        <IconButton label="Office settings" onClick={() => useStore.getState().openWindow('settings', 'office', 'Office settings')}><Settings size={20}/></IconButton>
+        <IconButton label="Sidebar controls" onClick={() => setSearchVisible(!searchVisible)}><SlidersHorizontal size={18}/></IconButton>
+        <IconButton label="Close office sidebar" className="mobile-sidebar-close" onClick={() => useStore.getState().setSidebarOpen(false)}><PanelLeftClose size={18}/></IconButton>
+      </header>
+      {officeMenu && <div className="office-menu">
+        <span className="eyebrow">YOUR OFFICES</span>
+        <button onClick={() => setOfficeMenu(false)}><span className="office-monogram">io</span><span><strong>{office.name}</strong><small>Private office · Owner</small></span><Check size={16}/></button>
+        <button onClick={() => { useStore.getState().openWindow('settings', 'office', 'Office settings'); setOfficeMenu(false); }}><Plus size={16}/> Create or join an office</button>
+      </div>}
+      <div className="sidebar-scroll">
+        <section className="sidebar-section">
+          <div className="section-label"><h2>Public chats</h2><IconButton label="Create a demo channel" onClick={() => setChannelForm(!channelForm)}><Plus size={15}/></IconButton></div>
+          {channelForm && <form className="channel-form" onSubmit={event => { event.preventDefault(); const id = useStore.getState().createChannel(channelName); if (id) { setChannelForm(false); setChannelName(''); setError(''); } else setError('Choose a unique channel name.'); }}>
+            <input aria-label="New channel name" autoFocus maxLength={32} placeholder="Channel name" value={channelName} onChange={event => setChannelName(event.target.value)}/><button className="primary-button" type="submit">Create</button>{error && <small role="alert">{error}</small>}
+          </form>}
+          {channels.map(channel => <button key={channel.id} className={`channel-row ${activeChannel === channel.id ? 'is-active' : ''}`} onClick={() => useStore.getState().openWindow('channel', channel.id)}>
+            <Hash size={19}/><span>{channel.name}</span>{channel.unread > 0 && <span className="unread-badge" aria-label={`${channel.unread} unread demo messages`}>{channel.unread}</span>}
+          </button>)}
+        </section>
+        <section className="sidebar-section people-section">
+          <div className="section-label"><h2>Direct messages</h2><IconButton label="Find a coworker" onClick={() => { setSearchVisible(!searchVisible); setQuery(''); }}><Plus size={18}/></IconButton></div>
+          {searchVisible && <label className="people-search"><Search size={15}/><input aria-label="Search coworkers" placeholder="Find someone…" value={query} onChange={event => setQuery(event.target.value)}/></label>}
+          {coworkers.filter(user => query ? user.name.toLowerCase().includes(query.toLowerCase()) : user.id !== 'keely').map(user => <div key={user.id} className="person-row">
+            <button className="person-avatar" aria-label={`View ${user.name}'s profile`} onClick={() => { useStore.getState().selectProfile(user.id); useStore.getState().setSidebarOpen(false); }}><Avatar user={user} size={32}/></button>
+            <button className="person-name" onClick={() => useStore.getState().openWindow('dm', user.id)}>{user.name}</button>
+            <IconButton label={`Message ${user.name}`} onClick={() => useStore.getState().openWindow('dm', user.id)}><MessageSquare size={12}/></IconButton>
+          </div>)}
+          {query && !coworkers.some(user => user.name.toLowerCase().includes(query.toLowerCase())) && <p className="muted no-results">No coworkers found.</p>}
+        </section>
+        <section className="sidebar-section voice-section">
+          <div className="section-label"><h2>Voice rooms</h2><IconButton label="View voice rooms" onClick={() => useStore.getState().openWindow('directory', 'rooms', 'Voice rooms')}><Plus size={18}/></IconButton></div>
+          {[{ name: 'General', count: 3, ids: ['gregoria', 'keely'] }, { name: 'Team Standup', count: 5, ids: ['gregoria', 'elisa', 'arturo', 'wilbert'] }, { name: 'Design Review', count: 0, ids: ['christeen', 'keely'] }].map((room, i) => <button key={room.name} className="voice-row" onClick={() => useStore.getState().joinCall(room.name, room.ids, 'audio')}><span className={i === 0 ? 'voice-icon is-green' : 'voice-icon'}><Volume2 size={20}/></span><span>{room.name}</span>{room.count > 0 && <small>{room.count}<ChevronRight size={12}/></small>}</button>)}
+          <button className="voice-row" onClick={() => useStore.getState().notify('This private room is invitation only in the demo.')}><span className="voice-icon"><LockKeyhole size={19}/></span><span>Private Room</span><LockKeyhole size={12}/></button>
+        </section>
       </div>
-
-      {/* Public Chats */}
-      <div className="p-4 border-b border-[var(--border-color)]">
-        <h3 className="text-xs font-semibold text-[var(--text-secondary)] mb-3 uppercase tracking-wider">Public Chats</h3>
-
-        <div className="space-y-3">
-          <div className="flex items-center justify-between group cursor-pointer">
-            <div className="flex items-center gap-3 text-[var(--text-primary)] font-medium">
-              <Globe className="w-4 h-4 text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]" />
-              Everyone
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between group cursor-pointer">
-            <div className="flex items-center gap-3 text-[var(--text-primary)] font-medium">
-              <MapPin className="w-4 h-4 text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]" />
-              Nearby
-            </div>
-            <div className="flex -space-x-2">
-              {coworkers.filter(c => c.isNearby).slice(0,3).map(c => (
-                <img key={c.id} src={c.avatar} alt={c.name} className="w-6 h-6 rounded-full border-2 border-white" />
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Online Coworkers */}
-      <div className="flex-1 flex flex-col min-h-0">
-        <div className="p-4 pb-2">
-          <div className="flex items-center gap-2 mb-3">
-            <h3 className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">Online Coworkers</h3>
-            <span className="bg-gray-100 dark:bg-gray-800 text-[var(--text-secondary)] text-xs px-2 py-0.5 rounded-full">{coworkers.length}</span>
-          </div>
-
-          <div className="relative">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]" />
-            <input
-              type="text"
-              placeholder="Search"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-gray-50 dark:bg-gray-900 border border-[var(--border-color)] rounded-full pl-9 pr-4 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--color-brand-yellow)]"
-            />
-          </div>
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-4 pt-2 space-y-4">
-          {filteredCoworkers.map((user) => (
-            <div key={user.id} className="flex items-center justify-between group">
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="relative shrink-0">
-                  <img src={user.avatar} alt={user.name} className="w-9 h-9 rounded-full" />
-                  <StatusDot status={user.status} />
-                </div>
-                <div className="min-w-0">
-                  <p className="font-medium text-[var(--text-primary)] truncate leading-tight">{user.name}</p>
-                  <p className="text-xs text-[var(--text-secondary)] truncate leading-tight">{user.location}</p>
-                </div>
-              </div>
-              <button className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-gray-100 dark:hover:bg-gray-800 p-1.5 rounded-md transition-colors opacity-0 group-hover:opacity-100">
-                <MessageSquare className="w-4 h-4" />
-              </button>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-};
+      <footer className="sidebar-footer"><button className="demo-label" onClick={() => useStore.getState().openWindow('settings', 'demo', 'About this demo')}><span/>Local demo <span className="demo-label-detail">· resets on reload</span></button><IconButton label="Open rewards" onClick={() => useStore.getState().showReward()}><Gift size={16}/></IconButton></footer>
+    </aside>
+  </>;
+}

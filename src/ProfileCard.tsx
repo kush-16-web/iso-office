@@ -1,67 +1,20 @@
 import { useState } from 'react';
-import { User, X, Navigation, MessageSquare,  } from 'lucide-react';
-import { type User as UserType } from './store';
-import { RewardWidget } from './RewardWidget';
-import { ChatPanel } from './ChatPanel';
-
-interface ProfileCardProps {
-  user: UserType;
-  position: { x: number; y: number };
-  onClose: () => void;
+import { ChevronDown, Gift, MessageSquare, Navigation, Phone, UserRound, X } from 'lucide-react';
+import { useStore } from './store';
+import { userById } from './data';
+import { WORLD_POSITIONS } from './world';
+import { Avatar } from './components/Avatar';
+import { IconButton } from './components/IconButton';
+export function ProfileCard() {
+  const selection = useStore(s => s.selectedProfile), bounds = useStore(s => s.bounds);
+  const [more, setMore] = useState(false);
+  if (!selection) return null;
+  const user = userById(selection.userId);
+  return <section className="profile-card" aria-label={`${user.name} profile card`} style={{ left: Math.max(12, Math.min(selection.x, bounds.width - 288)), top: Math.max(12, Math.min(selection.y, bounds.height - 300)) }}>
+    <IconButton className="profile-close" label="Close profile card" onClick={() => useStore.getState().selectProfile(null)}><X size={13}/></IconButton>
+    <div className="profile-summary"><div><h2>{user.name}</h2><p>{user.role}</p><span className="department-label">↗ {user.department}</span></div><Avatar user={user} size={58}/></div>
+    <div className="profile-primary-actions"><button className="primary-button" onClick={() => useStore.getState().openWindow('profile', user.id, user.name)}><UserRound size={16}/>Profile</button><button className="secondary-button" onClick={() => { useStore.getState().focusWorld(WORLD_POSITIONS[user.id]); useStore.getState().notify(`Camera centered on ${user.name}. Avatar walking isn’t available yet.`); }}><Navigation size={16}/>Go to</button></div>
+    <div className="profile-secondary-actions"><button className="secondary-button" onClick={() => useStore.getState().openWindow('dm', user.id)}><MessageSquare size={14}/>Chat</button><button className="secondary-button" onClick={() => useStore.getState().joinCall(user.name, [user.id], 'audio')}><Phone size={15}/>Call</button><button className="secondary-button" aria-expanded={more} onClick={() => setMore(!more)}>More<ChevronDown size={13}/></button></div>
+    {more && <div className="profile-more"><button onClick={() => { useStore.getState().showReward(user.id); setMore(false); }}><Gift size={15}/>Give a demo reward</button><button onClick={() => { useStore.getState().openWindow('directory', 'members', 'Office members'); setMore(false); }}><UserRound size={15}/>Office directory</button></div>}
+  </section>;
 }
-
-export const ProfileCard = ({ user, position, onClose }: ProfileCardProps) => {
-  const [showReward, setShowReward] = useState(false);
-  const [showChat, setShowChat] = useState(false);
-
-  return (
-    <>
-      <div
-        className="absolute bg-[var(--bg-panel)] border border-[var(--border-color)] rounded-2xl shadow-xl w-64 p-4 z-30 transform -translate-x-1/2 -translate-y-[120%]"
-        style={{ left: position.x, top: position.y }}
-      >
-        <button onClick={onClose} className="absolute top-2 right-2 p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800">
-          <X className="w-4 h-4" />
-        </button>
-
-        <div className="flex flex-col items-center mb-4">
-          <img src={user.avatar} alt={user.name} className="w-16 h-16 rounded-full mb-2 border-2 border-white shadow-sm" />
-          <h3 className="font-bold text-lg text-center leading-tight">{user.name}</h3>
-          <p className="text-sm text-[var(--text-secondary)]">{user.role || 'Team Member'}</p>
-          {user.department && (
-            <span className="mt-1 bg-emerald-100 text-emerald-800 text-xs px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
-              <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span> {user.department}
-            </span>
-          )}
-        </div>
-
-        <div className="grid grid-cols-2 gap-2">
-          <button className="flex items-center justify-center gap-1.5 bg-yellow-100 hover:bg-yellow-200 text-yellow-800 py-2 rounded-xl text-sm font-medium transition-colors">
-            <User className="w-4 h-4" /> Profile
-          </button>
-          <button
-            onClick={() => console.log(`Navigating to ${user.name}`)}
-            className="flex items-center justify-center gap-1.5 border border-gray-200 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800 py-2 rounded-xl text-sm font-medium transition-colors"
-          >
-            <Navigation className="w-4 h-4" /> Go to
-          </button>
-          <button
-            onClick={() => setShowChat(true)}
-            className="flex items-center justify-center gap-1.5 border border-gray-200 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800 py-2 rounded-xl text-sm font-medium transition-colors"
-          >
-            <MessageSquare className="w-4 h-4" /> Chat
-          </button>
-          <button
-            onClick={() => setShowReward(true)}
-            className="flex items-center justify-center gap-1.5 border border-gray-200 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800 py-2 rounded-xl text-sm font-medium transition-colors"
-          >
-            Send 🥐
-          </button>
-        </div>
-      </div>
-
-      {showReward && <RewardWidget user={user} onClose={() => setShowReward(false)} />}
-      {showChat && <ChatPanel user={user} onClose={() => setShowChat(false)} />}
-    </>
-  );
-};
