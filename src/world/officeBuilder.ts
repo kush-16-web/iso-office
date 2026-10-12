@@ -3,6 +3,8 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import type { User } from '../types';
 import { WORLD_POSITIONS } from '../world';
+import { OFFICE_ANCHORS } from './navigation';
+import type { CharacterMovementManager } from './characterController';
 
 export interface OfficeAssetCache {
   furniture: Record<string, THREE.Group>;
@@ -42,6 +44,10 @@ const FURNITURE_NAMES = [
   'loungeDesignSofa',
   'loungeDesignChair',
   'loungeChairRelax',
+  'cardboardBoxClosed',
+  'speakerSmall',
+  'pillow',
+  'pillowBlue',
   'bookcaseOpen',
   'bookcaseClosedWide',
   'books',
@@ -427,9 +433,22 @@ export function buildOfficeFurniture(scene: THREE.Scene, cache: OfficeAssetCache
   place('bookcaseOpen', 4, -15.2, 0.12, 0, 2.1);
   place('bookcaseClosedWide', 6.5, -15.2, 0.12, 0, 2.1);
 
+  // Books resting realistically on open bookcase shelves
+  place('books', -2, -15.2, 0.75, 0, 1.8);
+  place('books', -2, -15.2, 1.35, 0.1, 1.8);
+  place('books', -2, -15.2, 1.95, -0.1, 1.8);
+  place('books', 4, -15.2, 0.75, 0.05, 1.8);
+  place('books', 4, -15.2, 1.35, -0.05, 1.8);
+
+  // Storage archive boxes & plant atop bookcases
+  place('cardboardBoxClosed', 1, -15.2, 2.22, 0.1, 1.6);
+  place('cardboardBoxClosed', 6.5, -15.2, 2.22, -0.15, 1.6);
+  place('plantSmall2', 6.5, -15.2, 2.22, 0, 1.5);
+
   // Reading lounge in library
   place('rugRectangle', 1.5, -11.5, 0.14, 0, 2.4);
   place('loungeDesignChair', 4, -10.5, 0.14, -Math.PI / 4, 2.0); // Sephora Johnson
+  place('pillow', 4, -10.5, 0.58, -Math.PI / 4, 1.6);
   place('loungeChairRelax', -2, -12, 0.14, Math.PI / 4, 2.0); // Vanessa Brisker
   place('tableCoffeeSquare', 1, -11.5, 0.14, 0, 2.0);
   place('books', 1, -11.5, 0.75, 0.2, 1.8);
@@ -439,8 +458,11 @@ export function buildOfficeFurniture(scene: THREE.Scene, cache: OfficeAssetCache
   // --- 5. LOUNGE & BREAK PATIO (north-west, around x: -12, z: -12) ---
   place('rugRound', -12, -12, 0.14, 0, 2.8);
   place('loungeDesignSofa', -12, -13.2, 0.14, 0, 2.2);
+  place('pillow', -12.7, -13.1, 0.62, 0.15, 1.7);
+  place('pillowBlue', -11.3, -13.1, 0.62, -0.15, 1.7);
   place('loungeDesignChair', -10, -11, 0.14, -Math.PI / 3, 2.0);
   place('tableCoffeeGlass', -12, -11.5, 0.14, 0, 2.2);
+  place('plantSmall3', -12, -11.5, 0.75, 0, 1.5);
 
   // Coffee & refreshment station
   place('kitchenCabinet', -15.2, -13.5, 0.12, Math.PI / 2, 2.0);
@@ -595,20 +617,27 @@ const USER_ROTATIONS: Record<string, number> = {
 export function buildCharacters(
   scene: THREE.Scene,
   cache: OfficeAssetCache,
-  users: User[]
+  users: User[],
+  movementManager?: CharacterMovementManager
 ): { characters: THREE.Group[]; entities: CharacterEntity[] } {
   const characters: THREE.Group[] = [];
   const entities: CharacterEntity[] = [];
 
   users.forEach((user, i) => {
-    const pos = WORLD_POSITIONS[user.id] || { x: 0, z: 0 };
+    const anchor = OFFICE_ANCHORS[user.id];
+    const isSeated = anchor?.type === 'seated';
+    const posX = anchor ? anchor.position.x : (WORLD_POSITIONS[user.id]?.x ?? 0);
+    const posY = anchor ? anchor.position.y : 0.12;
+    const posZ = anchor ? anchor.position.z : (WORLD_POSITIONS[user.id]?.z ?? 0);
+    const rotY = anchor ? anchor.rotation : (USER_ROTATIONS[user.id] ?? 0);
+
     const modelUrl = USER_MODELS[user.id] || USER_MODELS.me;
     const charData = cache.characters[modelUrl];
 
     const group = new THREE.Group();
-    group.position.set(pos.x, 0.12, pos.z);
-    group.rotation.y = USER_ROTATIONS[user.id] ?? 0;
-    group.userData = { userId: user.id, offset: i * 0.7 };
+    group.position.set(posX, posY, posZ);
+    group.rotation.y = rotY;
+    group.userData = { userId: user.id, offset: i * 0.7, isSeated };
 
     if (charData) {
       // Properly clone skinned mesh and skeleton using SkeletonUtils
@@ -625,18 +654,32 @@ export function buildCharacters(
 
       // Animation Mixer
       const mixer = new THREE.AnimationMixer(model);
-      const idleClip = charData.animations.find((a) => a.name === 'idle') || charData.animations[0];
-      if (idleClip) {
-        const action = mixer.clipAction(idleClip);
-        action.play();
-        mixer.setTime(i * 0.85); // Stagger animations so they don't look cloned
+
+      if (movementManager && anchor) {
+        movementManager.registerCharacter(
+          user.id,
+          group,
+          mixer,
+          charData.animations,
+          anchor,
+          isSeated ? 'seated' : 'idle'
+        );
+      } else {
+        const clipName = isSeated ? 'sit' : 'idle';
+        const clip = charData.animations.find((a) => a.name === clipName) || charData.animations[0];
+        if (clip) {
+          const action = mixer.clipAction(clip);
+          action.play();
+          mixer.setTime(i * 0.85); // Stagger animations so they don't look cloned
+        }
       }
+
       entities.push({ userId: user.id, group, mixer });
     }
 
-    // Overhead Status Badge (billboard sprite)
+    // Overhead Status Badge (positioned appropriately for seated vs standing height)
     const badge = createStatusSprite(user.status);
-    badge.position.set(0, 2.15, 0);
+    badge.position.set(0, isSeated ? 1.85 : 2.15, 0);
     group.add(badge);
 
     scene.add(group);

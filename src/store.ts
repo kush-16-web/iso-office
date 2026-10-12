@@ -34,11 +34,24 @@ interface State {
   showReward: (recipient?: string) => void; hideReward: () => void;
   sendReward: (recipient: string, amount: number) => boolean;
   camera: { target: Point; zoom: number; revision: number }; cameraFootprint: Point[];
+  cameraMode: 'overview' | 'follow' | 'focus';
+  setCameraMode: (mode: 'overview' | 'follow' | 'focus') => void;
+  navigation: { isNavigating: boolean; targetUserId: string | null; targetName: string | null };
+  startNavigation: (targetUserId: string) => void;
+  cancelNavigation: () => void;
+  skipNavigation: () => void;
+  completeNavigation: () => void;
   focusWorld: (point: Point, zoom?: number) => void; setCameraFootprint: (points: Point[]) => void;
   sceneState: 'loading' | 'ready' | 'unavailable'; setSceneState: (state: State['sceneState']) => void;
-  notice: { id: number; text: string } | null; notify: (text: string) => void; clearNotice: () => void;
+  toasts: Array<{ id: number; text: string; title?: string; kind?: 'info' | 'success' | 'warn' | 'error' }>;
+  notice: { id: number; text: string; title?: string; kind?: 'info' | 'success' | 'warn' | 'error' } | null;
+  notify: (text: string, title?: string, kind?: 'info' | 'success' | 'warn' | 'error') => void;
+  clearNotice: (id?: number) => void;
+  dismissToast: (id: number) => void;
   createChannel: (name: string) => string | null;
 }
+export type ToastNotice = State['toasts'][number];
+let toastSeq = 0;
 const clock = () => new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 const makeWindow = (kind: WindowKind, targetId: string, title: string, bounds: Bounds, z: number): OfficeWindow => ({ id: `${kind}:${targetId}`, kind, targetId, title, rect: defaultRect(kind, bounds), mode: 'floating', restoreMode: 'floating', z });
 const initialWindows = (bounds: Bounds) => [makeWindow('dm', 'elisa', 'Elisa Lona', bounds, 10), makeWindow('channel', 'development', 'Development', bounds, 11)];
@@ -108,10 +121,60 @@ export const useStore = create<State>((set, get) => ({
     return true;
   },
   camera: { target: { x: -3, z: -3 }, zoom: 1, revision: 0 }, cameraFootprint: [],
+  cameraMode: 'overview',
+  setCameraMode: mode => set({ cameraMode: mode }),
+  navigation: { isNavigating: false, targetUserId: null, targetName: null },
+  startNavigation: (targetUserId: string) => {
+    const targetUser = userById(targetUserId);
+    const targetPos = WORLD_POSITIONS[targetUserId];
+    if (targetPos) {
+      set(state => ({
+        cameraMode: 'follow',
+        navigation: { isNavigating: true, targetUserId, targetName: targetUser?.name ?? targetUserId },
+        camera: { target: clampWorldPoint(targetPos), zoom: 1.15, revision: state.camera.revision + 1 },
+      }));
+    }
+  },
+  cancelNavigation: () => set({ cameraMode: 'overview', navigation: { isNavigating: false, targetUserId: null, targetName: null } }),
+  skipNavigation: () => set(state => {
+    const targetUserId = state.navigation.targetUserId;
+    const targetPos = targetUserId ? WORLD_POSITIONS[targetUserId] : null;
+    return {
+      cameraMode: 'focus',
+      navigation: { isNavigating: false, targetUserId: null, targetName: null },
+      ...(targetPos ? { camera: { target: clampWorldPoint(targetPos), zoom: 1.25, revision: state.camera.revision + 1 } } : {}),
+    };
+  }),
+  completeNavigation: () => set({ cameraMode: 'focus', navigation: { isNavigating: false, targetUserId: null, targetName: null } }),
   focusWorld: (point, zoom) => set(state => ({ camera: { target: clampWorldPoint(point), zoom: Math.max(0.65, Math.min(2.4, zoom ?? state.camera.zoom)), revision: state.camera.revision + 1 } })),
   setCameraFootprint: cameraFootprint => set({ cameraFootprint }),
   sceneState: 'loading', setSceneState: sceneState => set({ sceneState }),
-  notice: null, notify: text => set({ notice: { id: Date.now(), text } }), clearNotice: () => set({ notice: null }),
+  toasts: [],
+  notice: null,
+  notify: (text, title, kind = 'info') => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    const now = Date.now();
+    set(state => {
+      if (state.toasts.some(t => t.text === trimmed && now - Math.floor(t.id / 1000) < 2000)) return {};
+      toastSeq = (toastSeq + 1) % 1000;
+      const id = now * 1000 + toastSeq;
+      const newToast: ToastNotice = { id, text: trimmed, title, kind };
+      const updated = [newToast, ...state.toasts].slice(0, 4);
+      return { toasts: updated, notice: newToast };
+    });
+  },
+  dismissToast: id => set(state => {
+    const updated = state.toasts.filter(t => t.id !== id);
+    return { toasts: updated, notice: updated[0] ?? null };
+  }),
+  clearNotice: (id?: number) => set(state => {
+    if (id !== undefined) {
+      const updated = state.toasts.filter(t => t.id !== id);
+      return { toasts: updated, notice: updated[0] ?? null };
+    }
+    return { toasts: [], notice: null };
+  }),
   createChannel: name => {
     const trimmed = name.trim().replace(/^#+/, '').slice(0, 32);
     const state = get();

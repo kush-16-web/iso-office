@@ -10,8 +10,8 @@ import {
   buildOfficeFurniture,
   buildOfficeLighting,
   loadOfficeAssets,
-  type CharacterEntity,
 } from './world/officeBuilder';
+import { CharacterMovementManager } from './world/characterController';
 
 export function IsoCanvas() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -85,17 +85,16 @@ export function IsoCanvas() {
 
     // 3. Entity & Character references for raycasting and animation
     const characters: THREE.Group[] = [];
-    let entities: CharacterEntity[] = [];
     let isDisposed = false;
+    const movementManager = new CharacterMovementManager();
 
     // Load assets and build furniture + characters
     loadOfficeAssets()
       .then((cache) => {
         if (isDisposed) return;
         buildOfficeFurniture(scene, cache);
-        const built = buildCharacters(scene, cache, users);
+        const built = buildCharacters(scene, cache, users, movementManager);
         characters.push(...built.characters);
-        entities = built.entities;
         useStore.getState().setSceneState('ready');
       })
       .catch((err) => {
@@ -126,10 +125,16 @@ export function IsoCanvas() {
         ring.visible = false;
         return;
       }
-      const charPos = WORLD_POSITIONS[selection.userId];
-      if (charPos) {
-        ring.position.set(charPos.x, 0.16, charPos.z);
+      const charMesh = characters.find((mesh) => mesh.userData.userId === selection.userId);
+      if (charMesh) {
+        ring.position.set(charMesh.position.x, 0.16, charMesh.position.z);
         ring.visible = true;
+      } else {
+        const charPos = WORLD_POSITIONS[selection.userId];
+        if (charPos) {
+          ring.position.set(charPos.x, 0.16, charPos.z);
+          ring.visible = true;
+        }
       }
       if (!selection.anchored) return;
       const point = projectProfile(selection.userId);
@@ -157,6 +162,9 @@ export function IsoCanvas() {
     let syncing = false;
     const onControlChange = () => {
       if (syncing) return;
+      if (useStore.getState().cameraMode === 'follow') {
+        useStore.getState().setCameraMode('overview');
+      }
       const point = clampWorldPoint({ x: controls.target.x, z: controls.target.z });
       const dx = point.x - controls.target.x;
       const dz = point.z - controls.target.z;
@@ -186,6 +194,18 @@ export function IsoCanvas() {
       }
       if (state.selectedProfile?.userId !== previous.selectedProfile?.userId) {
         updateProfile();
+      }
+      // Handle Go to Person navigation triggers
+      if (state.navigation.isNavigating && !previous.navigation.isNavigating && state.navigation.targetUserId) {
+        movementManager.navigateToPerson(state.navigation.targetUserId, () => {
+          useStore.getState().completeNavigation();
+        });
+      } else if (!state.navigation.isNavigating && previous.navigation.isNavigating) {
+        if (state.cameraMode === 'focus') {
+          movementManager.skipTravel();
+        } else if (movementManager.isNavigating()) {
+          movementManager.cancelTravel();
+        }
       }
     });
 
@@ -262,11 +282,24 @@ export function IsoCanvas() {
     const animate = () => {
       frame = requestAnimationFrame(animate);
       if (document.hidden) return;
-      const delta = clock.getDelta();
-      // Animate characters via their skeletal animation mixers
-      for (let i = 0; i < entities.length; i++) {
-        entities[i].mixer.update(delta);
+      const delta = Math.min(clock.getDelta(), 0.1);
+
+      // Update movement manager (skeletal animations + path traversal + ambient life)
+      movementManager.update(delta);
+
+      // Smooth camera follow in Follow Avatar mode
+      const camMode = useStore.getState().cameraMode;
+      if (camMode === 'follow') {
+        const avatarPos = movementManager.getLocalAvatarPosition();
+        const factor = 1 - Math.exp(-4.5 * delta);
+        controls.target.x += (avatarPos.x - controls.target.x) * factor;
+        controls.target.z += (avatarPos.z - controls.target.z) * factor;
+        camera.position.x = controls.target.x + 28;
+        camera.position.z = controls.target.z + 28;
+        controls.update();
+        updateFootprint();
       }
+
       // Pulsing effect for selection ring
       if (ring.visible) {
         const time = clock.getElapsedTime();

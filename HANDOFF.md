@@ -1,66 +1,74 @@
-# IsoOffice Handoff — Pass 2 Premium World & Interaction Overhaul
+# IsoOffice Handoff — Pass 3 The Living Office Update
 
 ## Repository and Recovery
 - Repository: https://github.com/kush-16-web/iso-office.git
 - Target branch: `main`
-- Status: Pass 2 fully integrated, tested, and visually validated.
+- Status: Pass 3 fully implemented, tested (27/27 tests passing), and visually validated in the browser.
 
-## Completed in Pass 2
+---
 
-### 1. Downloaded CC0 3D Models & Office World
-- Integrated 140 modular furniture models from the **Kenney Furniture Kit (CC0 1.0 Universal)** into `public/models/furniture/`:
-  - Desks, corner desks, swivel chairs, modern frame cushion chairs, rounded chairs.
-  - Computer screens (single & dual setups), keyboards, mice, laptops.
-  - Large conference tables, round meeting tables, glass coffee tables, square coffee tables.
-  - Designer sofas, armchairs, relax lounge chairs, and circular/rectangular accent rugs.
-  - Tall open bookcases, wide closed bookcases, books.
-  - Indoor potted trees, ficus, monsteras, small desk plants.
-  - Floor lamps, table lamps, trash cans, coffee espresso machine, office speakers, and coat racks.
-- Created `src/world/officeBuilder.ts` assembling distinct architectural zones:
-  - **Open-plan working area**: Multiple desk bays with dual monitors, keyboards, mice, ergonomic swivel chairs, and desktop greenery.
-  - **Glass-walled meeting room**: Framed glass partition walls with mullions, large conference table, meeting chairs, laptop and plants.
-  - **Warm collaboration lounge**: Signature crimson/amber glowing room with glass table, red accent chairs, and warm point lighting matching the reference.
-  - **Executive library & archive**: Warm honey wood parquet flooring, dark back accent wall lined with open and closed bookcases filled with books, reading armchairs, and floor lamps.
-  - **Patio lounge & break area**: Lounge sofas, coffee table, refreshment station with espresso machine.
-  - **Walkways & circulation**: Sleek royal blue carpet runner connecting the main zones.
-  - **Architectural base**: Beveled diorama podium foundation with dark charcoal bevels.
-- Interior lighting & shadows:
-  - Directional sunlight casting soft PCF shadows (`PCFSoftShadowMap`).
-  - Warm amber glowing point light in the collaboration room (`0xff7028`).
-  - Warm incandescent study light in the library (`0xffab4e`).
-  - Cool task light in the conference room.
-  - Natural ambient light fill.
+## Completed in Pass 3: The Living Office Update
 
-### 2. Stylized 3D Animated Humanoid Characters
-- Replaced the old capsule-cylinder placeholders with 12 distinct rigged humanoid character models from **Kenney Mini Characters (CC0 1.0 Universal)** in `public/models/characters/`:
-  - `character-male-a.glb` through `character-male-f.glb`
-  - `character-female-a.glb` through `character-female-f.glb`
-- Properly instanced and scaled using `SkeletonUtils.clone` and `model.scale.setScalar(1.75)` for realistic human proportions relative to 0.8 unit desks and chairs.
-- Animated using skeletal `AnimationMixer` playing the built-in `'idle'` animation clip with staggered time offsets for natural, alive breathing motion.
-- Purposefully placed and oriented across all office zones (desks, conference tables, lounge, walkways).
-- Overhead 3D billboard status badges:
-  - Blue video camera badge for coworkers in call.
-  - Crisp emerald online presence badge.
-  - Pulsing selection ring at character feet on focus.
-- 3D raycasting character picking smoothly opens and anchors coworker profile cards.
+### 1. Character Placement & Collision Anchor System (Phase 1 & 6)
+- Created deterministic, collision-free anchor registry `OFFICE_ANCHORS` in `src/world/navigation.ts`:
+  - **Workstations**: Characters sit properly in ergonomic chairs (`chairDesk`), elevated accurately to seat height (`y = 0.42`), rotated to face their dual monitors or laptops.
+  - **West Meeting Room**: Meeting participants (Elisa, Wilbert, Kaeya, Edgar) occupy conference chairs around the central table and meeting pod, facing tables rather than floating inside them.
+  - **Amber Collaboration Room**: Arturo sits in the rounded crimson accent chair facing the glass coffee table, with Keely standing comfortably in a natural conversation posture facing him.
+  - **Executive Library & Reading Lounge**: Sephora and Vanessa sit in relaxed lounge chairs (`loungeDesignChair`, `loungeChairRelax`) reading books.
+  - **Clearances**: Every anchor has an unobstructed approach point for navigation with zero intersection with desks, glass walls, or partitions.
 
-### 3. Coworker Identity & Video Feed Polish
-- Added real photographic / styled headshots in `public/portraits/` for Mark Verona (You), Gregoria Comacho, Keely Jansen, and Elisa Lona.
-- Updated `src/components/Avatar.tsx` to render full photographic portraits with graceful SVG fallback.
-- Updated `src/VideoTiles.tsx` so call video feeds fill tiles cleanly with authentic video stream framing matching the reference.
+### 2. Real Character Movement & Animation Controller (Phase 2 & 3)
+- Implemented `CharacterMovementManager` in `src/world/characterController.ts`:
+  - Fully supports animation blending between clips (`idle`, `walk`, `sit`, `emote-yes`, `interact-right`).
+  - Implemented A* shortest path search (`calculateNavRoute`) across a 27-node waypoint navigation graph covering all office zones, corridors, and doorways.
+  - Smooth turning: Characters orient naturally towards their direction of travel at 8.0 rad/s before and during motion.
+  - Natural walking speed: Avatar moves briskly at 3.2 units/s along the collision-free path.
+  - Believable transitions: If the avatar is seated at their desk when "Go to Person" is clicked, they stand up, blend to walking, follow the route, stop at the coworker's approach anchor, and turn to face the coworker upon arrival.
+  - Ambient life: Idle coworkers periodically perform subtle conversational gestures (nodding in meeting rooms, subtle posture shifts) rather than standing completely frozen.
 
-### 4. Smooth Floating Window Animations & Interactions
-- Implemented smooth cubic-bezier transitions for opening, moving, maximizing, focusing, and restoring floating windows:
-  - Opening animation: subtle scale and lift (`0.28s cubic-bezier(0.16, 1, 0.3, 1)`).
-  - Dragging performance: hardware-accelerated with transition suppression during active pointer drags for 60fps immediate responsiveness.
-  - Focus elevation: deeper soft box-shadows and subtle border highlights.
-  - Minimized dock: sleek dock items with avatar icons, channel hashes, hover lift, and pop-in animations.
-  - Profile card pop animation.
-  - Full support for `prefers-reduced-motion`.
+### 3. "Go to Person" Navigation & Follow Camera (Phase 3 & 4)
+- Connected "Go to Person" in `ProfileCard.tsx` directly to the navigation pathfinder:
+  - Local avatar turns, stands up, and walks through doors and corridors without snapping.
+  - Interactive top-center travel banner (`NavigationBanner.tsx`) displays "Walking to [Coworker Name]..." with a pulsing footstep indicator.
+  - User can click **Skip Travel** for immediate arrival or **Cancel** to halt walking at the current position.
+  - Camera Follow Avatar mode: Smoothly tracks the avatar using frame-rate independent exponential damping (`controls.target.lerp(avatarPos, 1 - Math.exp(-4.5 * delta))`).
+  - Seamless overview recovery: Manually orbiting or panning the camera smoothly releases follow mode and transitions back to overview.
+  - Arrival framing: When navigation completes, the avatar faces the coworker, and the coworker receives a subtle visual highlight ring.
 
-### 5. Verification & Asset Documentation
-- `ASSET_CREDITS.md` created with verified CC0 licensing information and direct source links.
-- `npm test`: 23/23 tests pass cleanly.
-- `npm run typecheck`: 0 TypeScript errors.
-- `npm run build`: Production bundle builds successfully.
-- Visual validation: Captured screenshots in the live dev environment comparing favorably with the reference image.
+### 4. Redesigned Top-Right Notification System (Phase 5)
+- Completely relocated toast notifications to the top-right viewport area (`.toast-container` in `src/components/ToastNotification.tsx` and `src/App.css`):
+  - **Zero obstruction**: Never overlaps the bottom minimized-window dock, bottom call controls, or sidebar.
+  - **Compact premium card style**: Dark glassmorphic background (`rgba(23, 31, 46, 0.94)` with `backdrop-filter: blur(14px)`), rounded corners, soft shadow, and left accent borders (`info` blue, `success` emerald, `warn` amber, `error` red).
+  - **Contextual icons**: Distinct icons (`Info`, `CheckCircle2`, `AlertTriangle`, `AlertCircle`) and title headers.
+  - **Stacking & deduplication**: Supports stacking up to 4 notifications with automatic deduplication of repeated messages within 2 seconds.
+  - **Pause on hover**: Hovering over a notification card pauses its auto-dismiss timer.
+  - **Dismiss button**: Dedicated accessible dismiss control with `stopPropagation()` to prevent clicking underlying UI elements.
+
+### 5. Environment Detail Pass (Phase 7)
+- Decorated open shelves and workstations using CC0 Kenney modular assets:
+  - Books realistically stacked across multiple shelf levels in the Executive Library open bookcases (`x = -2` and `x = 4`).
+  - Archive cardboard storage boxes (`cardboardBoxClosed.glb`) and potted plants atop closed bookcases.
+  - Decorative accent pillows (`pillow.glb`, `pillowBlue.glb`) placed on patio and library lounge sofas.
+  - Small desk stereo speakers (`speakerSmall.glb`) flanking workstation monitors.
+
+### 6. Window Animation Polish & Skeleton Loading (Phase 8 & 9)
+- Window minimize/restore transitions:
+  - Windows animate smoothly with hardware-accelerated cubic-bezier curves (`0.3s cubic-bezier(0.16, 1, 0.3, 1)`).
+  - Minimized dock tabs pop in and lift on hover with clear labels (`Restore [Title]`).
+- 3D Scene Loading Overlay (`src/components/SceneLoadingOverlay.tsx`):
+  - Lightweight branded overlay with animated spinner, progress shimmer bar, and status feedback during asset loading.
+  - Smooth reveal when required assets and characters are ready.
+- Reusable skeleton loading components in `src/components/Skeleton.tsx` for asynchronous panels.
+
+---
+
+## Test Verification & Quality Assurance
+
+- **Unit & Integration Tests**: 27/27 tests passing (`npm test`):
+  - 23 baseline Pass 1 & Pass 2 tests intact (window bounds, minimize/restore, drafts, attachments, media controls, minimap, sidebar).
+  - 4 Pass 3 tests covering anchor uniqueness, A* waypoint connectivity, notification stacking & dismissal, and travel state transitions.
+- **TypeScript**: 0 typecheck errors (`npm run typecheck`).
+- **Browser Validation**: Visually verified with browser subagents on `http://localhost:5173`:
+  - `start_camera_notification_toast_1791790134233.png`: Confirmed top-right toast card cleanly displays without obstructing dock or controls.
+  - `walking_state_1791789803214.png`: Confirmed active travel banner, avatar standing up and walking collision-free route.
+  - `arrived_at_wilbert_1791789814780.png`: Confirmed arrival and framing at meeting room entrance.
