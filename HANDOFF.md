@@ -1,9 +1,61 @@
-# IsoOffice Handoff — Pass 3 The Living Office Update
+# IsoOffice Handoff — Pass 4: The Living Workplace
 
 ## Repository and Recovery
 - Repository: https://github.com/kush-16-web/iso-office.git
 - Target branch: `main`
-- Status: Pass 3 fully implemented, tested (27/27 tests passing), and visually validated in the browser.
+- Status: Pass 4 fully implemented, tested (27/27 tests passing), verified with 0 TypeScript errors, production build verified, and visually validated in the browser.
+
+---
+
+## Completed in Pass 4: The Living Workplace
+
+### 1. Camera Composition & Viewport Presentation (Phase A)
+- Calibrated default isometric camera extent in `src/IsoCanvas.tsx` (`d = 10.2`) to bring the viewpoint closer to the central working area, directly matching the composition of the reference image.
+- Expanded architectural foundation mesh to `BoxGeometry(56, 0.8, 52)` and perimeter floor border `BoxGeometry(48, 0.08, 44)` so the office floor bleeds off all screen edges naturally.
+- Eliminated excessive dark void around the office; the scene remains visible and detailed behind floating UI windows.
+- Added solid perimeter architecture walls behind the library (`z = -15.8`) and west meeting rooms (`x = -16.2`) to frame the space.
+
+### 2. Densely Furnished Bookshelves & Workstations (Phase B1 & B2)
+- **Executive Library & Shelves**:
+  - Every visible open bookcase shelf (`bookcaseOpen` and `bookcaseOpenLow`) along the continuous back wall (`z = -15.2`) is populated with procedural book rows (`createShelfBookRow`), multi-book vertical stacks (`createBookStack`), and leaning books.
+  - Tops of bookcases decorated with archive cardboard boxes (`cardboardBoxClosed`, `cardboardBoxOpen`), small potted plants, a vintage radio, and the golden bear mascot trophy (`bear.glb`).
+  - Placed a low bookcase room divider (`bookcaseOpenLow`) near the reading lounge, fully stocked with books and plants.
+- **Workstations**:
+  - Added fabric acoustic privacy dividers (`createDeskDivider`) to workstation setups.
+  - Placed ceramic coffee mugs with rich espresso liquid (`createCoffeeMug`) with distinct curated colors on desks.
+  - Placed hardcover notebooks with pens (`createNotebook`) on workstations.
+  - Retained dual monitors, laptop setups, desk lamps, stereo speakers, and small desk plants.
+
+### 3. Enriched Meeting Rooms & Collaborative Lounge Spaces (Phase B3 & B4)
+- **Conference Room (West Wing)**:
+  - Mounted architectural Agile Roadmap Whiteboard (`createWhiteboard(3.6, 2.0)`) on the west wall with Sprint blocks, sticky notes, and SLO indicators.
+  - Placed large video conference presentation display (`televisionModern.glb`) on the east wall partition frame.
+  - Laptops, hardcover notebooks, and ceramic mugs placed on the conference table.
+  - Added corner storage cabinets with archive boxes (`sideTableDrawers.glb`, `cardboardBoxClosed.glb`).
+- **Secondary Meeting Pod**:
+  - Decorated round meeting table with notebooks and mugs.
+- **Crimson Collaboration Lounge**:
+  - Added cushions on accent chairs (`pillow.glb`, `pillowBlue.glb`), coffee mugs on the glass coffee table, and magazine stacks.
+- **Patio Lounge & Refreshment Station**:
+  - Placed long accent sofa pillows (`pillowLong.glb`, `pillowBlueLong.glb`).
+  - Built a full kitchenette counter with `kitchenFridgeSmall.glb`, `kitchenCabinet.glb`, `kitchenCoffeeMachine.glb`, `kitchenMicrowave.glb`, and mugs.
+
+### 4. Hydration Stations & Corridor Detailing (Phase B5)
+- Placed dual office hydration water dispensers (`createWaterDispenser`) with realistic transparent blue water carafes in the central corridor and meeting foyer.
+- Added matching recycling and trash bins.
+- Added side console tables with storage boxes and potted plants in open office peripheral zones.
+
+### 5. Unified Premium Muted Slate-Blue UI Theme (Phase D)
+- Replaced generic pure-white sidebar with the requested slate-blue design system:
+  - Background gradient: `#edf2f7` to `#e5eaf1` with subtle border `#cdd8e4`.
+  - Deep slate typography: `#26384F` for primary text, `#415A77` for section headers and icons.
+  - Active channel state: Deep slate pill `#26384F` with warm golden `#F0B73E` icon.
+  - Badges & accents: Warm golden `#F0B73E` unread badges and monogram.
+- Floating windows:
+  - Restrained tinted header gradient (`#f4f8fc` to `#ebf1f7`) with `#dbe4ee` divider and deep slate text.
+  - Focused window elevated with deep slate shadow and `#415A77` border.
+- Top-right notification toasts:
+  - Cohesive dark slate glassmorphic surface (`rgba(38, 56, 79, 0.96)`) with muted blue border (`rgba(169, 185, 204, 0.35)`), golden warning/accent highlights, and smooth entry/exit animations.
 
 ---
 

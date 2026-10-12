@@ -5,6 +5,16 @@ import type { User } from '../types';
 import { WORLD_POSITIONS } from '../world';
 import { OFFICE_ANCHORS } from './navigation';
 import type { CharacterMovementManager } from './characterController';
+import {
+  createShelfBookRow,
+  createBookStack,
+  createSingleBook,
+  createCoffeeMug,
+  createNotebook,
+  createWhiteboard,
+  createWaterDispenser,
+  createDeskDivider,
+} from './officeProps';
 
 export interface OfficeAssetCache {
   furniture: Record<string, THREE.Group>;
@@ -45,11 +55,25 @@ const FURNITURE_NAMES = [
   'loungeDesignChair',
   'loungeChairRelax',
   'cardboardBoxClosed',
+  'cardboardBoxOpen',
   'speakerSmall',
   'pillow',
   'pillowBlue',
+  'pillowLong',
+  'pillowBlueLong',
   'bookcaseOpen',
+  'bookcaseOpenLow',
   'bookcaseClosedWide',
+  'bookcaseClosedDoors',
+  'sideTableDrawers',
+  'paneling',
+  'radio',
+  'bear',
+  'benchCushionLow',
+  'kitchenFridgeSmall',
+  'kitchenMicrowave',
+  'televisionModern',
+  'lampSquareTable',
   'books',
   'lampRoundFloor',
   'lampSquareFloor',
@@ -123,8 +147,8 @@ export function buildOfficeArchitecture(scene: THREE.Scene) {
   const root = new THREE.Group();
   root.name = 'office_architecture';
 
-  // 1. Sleek architectural foundation slab / podium (dark charcoal bevel)
-  const baseGeom = new THREE.BoxGeometry(32, 0.8, 30);
+  // 1. Sleek architectural foundation slab / podium (expanded to fill viewport edges naturally)
+  const baseGeom = new THREE.BoxGeometry(56, 0.8, 52);
   const baseMat = new THREE.MeshStandardMaterial({
     color: '#222834',
     roughness: 0.7,
@@ -134,6 +158,17 @@ export function buildOfficeArchitecture(scene: THREE.Scene) {
   baseMesh.position.set(-4, -0.45, -3);
   baseMesh.receiveShadow = true;
   root.add(baseMesh);
+
+  // Extended perimeter architectural floor (soft warm slate border)
+  const perimeterGeom = new THREE.BoxGeometry(48, 0.08, 44);
+  const perimeterMat = new THREE.MeshStandardMaterial({
+    color: '#dbe3ec',
+    roughness: 0.8,
+  });
+  const perimeterFloor = new THREE.Mesh(perimeterGeom, perimeterMat);
+  perimeterFloor.position.set(-4, 0.01, -3);
+  perimeterFloor.receiveShadow = true;
+  root.add(perimeterFloor);
 
   // 2. Floor zones
   // Zone A: Main Open Office Floor (clean modern warm off-white/light-slate)
@@ -287,15 +322,25 @@ export function buildOfficeArchitecture(scene: THREE.Scene) {
   amberWall2.position.set(4, 0.1, -0.4);
   root.add(amberWall2);
 
-  // Library back wall (solid stylish dark wood accent wall)
+  // Library back wall (solid stylish dark charcoal accent wall)
   const libBackWall = new THREE.Mesh(
-    new THREE.BoxGeometry(16, 3, 0.3),
-    new THREE.MeshStandardMaterial({ color: '#2d333b', roughness: 0.85 })
+    new THREE.BoxGeometry(22, 3.2, 0.3),
+    new THREE.MeshStandardMaterial({ color: '#252a33', roughness: 0.85 })
   );
-  libBackWall.position.set(0, 1.5, -15.8);
+  libBackWall.position.set(0, 1.6, -15.8);
   libBackWall.castShadow = true;
   libBackWall.receiveShadow = true;
   root.add(libBackWall);
+
+  // West wing outer architectural wall behind meeting rooms
+  const westWall = new THREE.Mesh(
+    new THREE.BoxGeometry(0.3, 3.2, 28),
+    new THREE.MeshStandardMaterial({ color: '#252a33', roughness: 0.85 })
+  );
+  westWall.position.set(-16.2, 1.6, -2);
+  westWall.castShadow = true;
+  westWall.receiveShadow = true;
+  root.add(westWall);
 
   scene.add(root);
 }
@@ -315,12 +360,19 @@ export function buildOfficeFurniture(scene: THREE.Scene, cache: OfficeAssetCache
     return item;
   };
 
-  // Helper: Assemble a high-fidelity workstation cluster
+  // Helper: Assemble a high-fidelity workstation cluster with divider, peripherals, mugs, and notebooks
   const addWorkstation = (
     x: number,
     z: number,
     rotY = 0,
-    options: { dual?: boolean; plant?: boolean; laptop?: boolean } = {}
+    options: {
+      dual?: boolean;
+      plant?: boolean;
+      laptop?: boolean;
+      mugColor?: string;
+      noteColor?: string;
+      dividerColor?: string;
+    } = {}
   ) => {
     // 1. Desk
     place('desk', x, z, 0.12, rotY, 2.1);
@@ -329,6 +381,12 @@ export function buildOfficeFurniture(scene: THREE.Scene, cache: OfficeAssetCache
     const cos = Math.cos(rotY);
     const sin = Math.sin(rotY);
     const deskY = 0.92;
+
+    // Acoustic fabric privacy divider at rear of desk
+    const divider = createDeskDivider(1.6, 0.48, options.dividerColor || '#475569');
+    divider.position.set(x - sin * 0.46, deskY, z - cos * 0.46);
+    divider.rotation.y = rotY;
+    root.add(divider);
 
     // Chair placed behind desk facing it
     const chairDist = 0.75;
@@ -353,9 +411,20 @@ export function buildOfficeFurniture(scene: THREE.Scene, cache: OfficeAssetCache
       place('computerMouse', x + cos * 0.3, z + sin * 0.22, deskY, rotY, 1.8);
     }
 
+    // Ceramic coffee mug on desk
+    const mug = createCoffeeMug(options.mugColor || '#ffffff');
+    mug.position.set(x + cos * 0.55 + sin * 0.18, deskY, z - sin * 0.55 + cos * 0.18);
+    root.add(mug);
+
+    // Hardcover notebook & pen
+    const notebook = createNotebook(options.noteColor || '#1e3a5f');
+    notebook.position.set(x - cos * 0.48 + sin * 0.22, deskY, z + sin * 0.48 + cos * 0.22);
+    notebook.rotation.y = rotY + 0.12;
+    root.add(notebook);
+
     // Optional desk accessory
     if (options.plant) {
-      place('plantSmall1', x - cos * 0.55, z + sin * 0.1, deskY, rotY, 1.7);
+      place('plantSmall1', x - cos * 0.55, z + sin * 0.05, deskY, rotY, 1.7);
     } else {
       place('lampRoundTable', x + cos * 0.55, z - sin * 0.1, deskY, rotY, 1.5);
     }
@@ -366,23 +435,58 @@ export function buildOfficeFurniture(scene: THREE.Scene, cache: OfficeAssetCache
 
   // --- 1. OPEN PLAN WORKSPACE ---
   // Workstation A (Me / Mark Verona: target x: 2, z: 2)
-  addWorkstation(2, 2.6, 0, { dual: true, plant: true });
+  addWorkstation(2, 2.6, 0, {
+    dual: true,
+    plant: true,
+    mugColor: '#2563eb',
+    noteColor: '#1e293b',
+    dividerColor: '#3b82f6',
+  });
 
   // Workstation B (Gregoria Comacho: target x: 0, z: -1.5)
-  addWorkstation(0, -1.9, 0, { dual: true });
+  addWorkstation(0, -1.9, 0, {
+    dual: true,
+    mugColor: '#f97316',
+    noteColor: '#0f766e',
+    dividerColor: '#475569',
+  });
 
   // Workstation C (Christeen Violette: target x: 4.5, z: 3)
-  addWorkstation(4.8, 3, Math.PI / 2, { laptop: true, plant: true });
+  addWorkstation(4.8, 3, Math.PI / 2, {
+    laptop: true,
+    plant: true,
+    mugColor: '#ec4899',
+    noteColor: '#4338ca',
+    dividerColor: '#6366f1',
+  });
 
   // Workstation D (Deane Chadburn: target x: -2.5, z: 5)
-  addWorkstation(-2.5, 4.8, -Math.PI / 2, { dual: true });
+  addWorkstation(-2.5, 4.8, -Math.PI / 2, {
+    dual: true,
+    mugColor: '#10b981',
+    noteColor: '#b45309',
+    dividerColor: '#059669',
+  });
 
-  // Extra aesthetic desks to create a real office environment
-  addWorkstation(-2.5, 2.5, -Math.PI / 2, { dual: false, plant: true });
-  addWorkstation(0, 5, 0, { laptop: true });
-  addWorkstation(4.8, 5.5, Math.PI / 2, { dual: true });
+  // Extra aesthetic desks to create a real, dense office environment
+  addWorkstation(-2.5, 2.5, -Math.PI / 2, {
+    dual: false,
+    plant: true,
+    mugColor: '#eab308',
+    dividerColor: '#64748b',
+  });
+  addWorkstation(0, 5, 0, {
+    laptop: true,
+    mugColor: '#8b5cf6',
+    dividerColor: '#475569',
+  });
+  addWorkstation(4.8, 5.5, Math.PI / 2, {
+    dual: true,
+    mugColor: '#06b6d4',
+    dividerColor: '#334155',
+  });
 
-  // Divider cabinets and potted plants between desk clusters
+  // Decorative plants & floor lighting between desk clusters
   place('pottedPlant', 3.4, 0.5, 0.12, 0, 2.2);
   place('pottedPlant', -1.2, 0.5, 0.12, 0, 2.0);
   place('pottedPlant', -4.2, 4.0, 0.12, 0, 2.2);
@@ -397,85 +501,245 @@ export function buildOfficeFurniture(scene: THREE.Scene, cache: OfficeAssetCache
   place('chairModernCushion', -12, 3.1, 0.12, Math.PI, 2.0);
   place('chairModernCushion', -12, 0.9, 0.12, 0, 2.0);
 
-  // Accessories on conference table
-  place('laptop', -12, 2, 0.9, 0, 1.6);
+  // Laptops and accessories on conference table
+  place('laptop', -12, 1.3, 0.9, 0, 1.6);
+  place('laptop', -12, 2.7, 0.9, Math.PI, 1.6);
   place('plantSmall2', -12.8, 2, 0.9, 0, 1.5);
+
+  const confNote1 = createNotebook('#1e293b');
+  confNote1.position.set(-11.4, 0.9, 2);
+  root.add(confNote1);
+
+  const confNote2 = createNotebook('#0f766e');
+  confNote2.position.set(-12.6, 0.9, 2);
+  root.add(confNote2);
+
+  const confMug1 = createCoffeeMug('#ffffff');
+  confMug1.position.set(-11.3, 0.9, 2.4);
+  root.add(confMug1);
+
+  const confMug2 = createCoffeeMug('#2563eb');
+  confMug2.position.set(-12.7, 0.9, 1.6);
+  root.add(confMug2);
+
+  // Mounted Agile Whiteboard with architecture roadmap on west wall
+  const whiteboard = createWhiteboard(3.6, 2.0);
+  whiteboard.position.set(-15.8, 1.9, 2);
+  whiteboard.rotation.y = Math.PI / 2;
+  root.add(whiteboard);
+
+  // Large presentation screen display on east partition frame
+  place('televisionModern', -8.1, 2, 1.15, -Math.PI / 2, 2.2);
 
   // Secondary meeting pod (around x: -12, z: -5)
   place('tableRound', -12, -5, 0.12, 0, 2.0);
-  place('chairRounded', -12, -3.8, 0.12, Math.PI, 1.9); // Kaeya Furlong
-  place('chairRounded', -12, -6.2, 0.12, 0, 1.9); // Edgar Enríquez
+  place('chairRounded', -12, -3.8, 0.12, Math.PI, 1.9); // Kaeya Furlong sits here
+  place('chairRounded', -12, -6.2, 0.12, 0, 1.9); // Edgar Enríquez sits here
   place('chairRounded', -10.8, -5, 0.12, -Math.PI / 2, 1.9);
   place('plantSmall3', -12, -5, 0.88, 0, 1.6);
 
-  // Corner plants & floor lamp in meeting room
+  const podNote = createNotebook('#b45309');
+  podNote.position.set(-11.7, 0.88, -4.7);
+  root.add(podNote);
+
+  const podMug = createCoffeeMug('#3b82f6');
+  podMug.position.set(-12.3, 0.88, -5.3);
+  root.add(podMug);
+
+  // Corner storage & plants in meeting room
+  place('sideTableDrawers', -15.2, -0.5, 0.12, 0, 2.0);
+  place('cardboardBoxClosed', -15.2, -0.5, 1.05, 0.1, 1.5);
   place('pottedPlant', -15.2, 6.8, 0.12, 0, 2.4);
   place('pottedPlant', -15.2, -6.8, 0.12, 0, 2.2);
   place('lampSquareFloor', -8.8, -6.5, 0.12, 0, 2.0);
 
   // --- 3. AMBER / CRIMSON WARM COLLABORATION ROOM (south-east, x: 4, z: -4) ---
-  // The glowing room matching the reference image!
+  // The signature glowing room matching the reference image!
   place('rugRound', 4, -4, 0.16, 0, 2.6);
   place('tableCoffeeGlass', 4, -4, 0.17, 0, 2.4);
+
   // 4 red/warm accent chairs around the table
   place('chairRounded', 5.1, -4, 0.16, -Math.PI / 2, 2.0); // Arturo Hirst
   place('chairRounded', 2.9, -4, 0.16, Math.PI / 2, 2.0);
   place('chairRounded', 4, -2.9, 0.16, Math.PI, 2.0);
   place('chairRounded', 4, -5.1, 0.16, 0, 2.0); // Keely Jansen nearby
-  // Plants and warm lighting decor
+
+  // Decor and cushions in warm lounge
+  place('pillow', 5.1, -4, 0.58, -Math.PI / 2, 1.5);
+  place('pillowBlue', 2.9, -4, 0.58, Math.PI / 2, 1.5);
+  place('books', 4.0, -4.0, 0.65, 0.25, 1.6);
+
+  const warmMug1 = createCoffeeMug('#b91c1c');
+  warmMug1.position.set(4.25, 0.65, -3.8);
+  root.add(warmMug1);
+
+  const warmMug2 = createCoffeeMug('#f59e0b');
+  warmMug2.position.set(3.75, 0.65, -4.2);
+  root.add(warmMug2);
+
   place('pottedPlant', 6.6, -1.2, 0.16, 0, 2.2);
   place('pottedPlant', 6.6, -6.8, 0.16, 0, 2.2);
 
   // --- 4. EXECUTIVE LIBRARY & ARCHIVE (north wing, z: -12 to -16) ---
-  // Bookcases lined along the dark back wall
-  place('bookcaseOpen', -2, -15.2, 0.12, 0, 2.1);
-  place('bookcaseClosedWide', 1, -15.2, 0.12, 0, 2.1);
-  place('bookcaseOpen', 4, -15.2, 0.12, 0, 2.1);
-  place('bookcaseClosedWide', 6.5, -15.2, 0.12, 0, 2.1);
+  // Densely populated continuous wall of bookcases matching the reference image!
+  place('bookcaseClosedDoors', -5.0, -15.2, 0.12, 0, 2.1);
+  place('plantSmall3', -5.0, -15.2, 2.22, 0, 1.5);
 
-  // Books resting realistically on open bookcase shelves
-  place('books', -2, -15.2, 0.75, 0, 1.8);
-  place('books', -2, -15.2, 1.35, 0.1, 1.8);
-  place('books', -2, -15.2, 1.95, -0.1, 1.8);
-  place('books', 4, -15.2, 0.75, 0.05, 1.8);
-  place('books', 4, -15.2, 1.35, -0.05, 1.8);
+  place('bookcaseOpen', -2.5, -15.2, 0.12, 0, 2.1);
+  // Densely fill all 3 visible shelves of bookcaseOpen at -2.5:
+  const libRow1 = createShelfBookRow(0.66, 0.22, { minHeight: 0.22, maxHeight: 0.32, colorSeed: 2 });
+  libRow1.position.set(-2.5, 0.74, -15.2);
+  root.add(libRow1);
 
-  // Storage archive boxes & plant atop bookcases
-  place('cardboardBoxClosed', 1, -15.2, 2.22, 0.1, 1.6);
-  place('cardboardBoxClosed', 6.5, -15.2, 2.22, -0.15, 1.6);
-  place('plantSmall2', 6.5, -15.2, 2.22, 0, 1.5);
+  const libRow2 = createShelfBookRow(0.66, 0.22, { minHeight: 0.20, maxHeight: 0.28, colorSeed: 5 });
+  libRow2.position.set(-2.5, 1.34, -15.2);
+  root.add(libRow2);
+
+  const libStack1 = createBookStack(4, 0.22, 0.26, 3);
+  libStack1.position.set(-2.68, 1.94, -15.2);
+  root.add(libStack1);
+
+  const libBookLean = createSingleBook(0.06, 0.28, 0.2, '#742a2a');
+  libBookLean.position.set(-2.34, 1.94, -15.2);
+  libBookLean.rotation.z = -0.18;
+  root.add(libBookLean);
+
+  place('cardboardBoxOpen', -2.75, -15.2, 2.22, 0.08, 1.5);
+  place('bear', -2.25, -15.2, 2.22, 0, 1.4); // Mascot trophy award!
+
+  // Low central bookcase unit
+  place('bookcaseOpenLow', 0.0, -15.2, 0.12, 0, 2.1);
+  const libLowRow1 = createShelfBookRow(0.66, 0.22, { minHeight: 0.18, maxHeight: 0.26, colorSeed: 8 });
+  libLowRow1.position.set(0.0, 0.42, -15.2);
+  root.add(libLowRow1);
+
+  const libLowStack = createBookStack(3, 0.2, 0.24, 7);
+  libLowStack.position.set(-0.16, 0.92, -15.2);
+  root.add(libLowStack);
+
+  const libLowRow2 = createShelfBookRow(0.32, 0.22, { minHeight: 0.2, maxHeight: 0.25, colorSeed: 11 });
+  libLowRow2.position.set(0.18, 0.92, -15.2);
+  root.add(libLowRow2);
+
+  place('radio', -0.15, -15.2, 1.25, 0, 1.5);
+  place('plantSmall1', 0.2, -15.2, 1.25, 0, 1.5);
+
+  // Second tall open bookcase at 2.5
+  place('bookcaseOpen', 2.5, -15.2, 0.12, 0, 2.1);
+  const libRow3 = createShelfBookRow(0.66, 0.22, { minHeight: 0.22, maxHeight: 0.3, colorSeed: 14 });
+  libRow3.position.set(2.5, 0.74, -15.2);
+  root.add(libRow3);
+
+  const libStack2 = createBookStack(3, 0.22, 0.26, 10);
+  libStack2.position.set(2.34, 1.34, -15.2);
+  root.add(libStack2);
+
+  const libRow3b = createShelfBookRow(0.34, 0.22, { minHeight: 0.22, maxHeight: 0.28, colorSeed: 17 });
+  libRow3b.position.set(2.68, 1.34, -15.2);
+  root.add(libRow3b);
+
+  const libRow4 = createShelfBookRow(0.66, 0.22, { minHeight: 0.2, maxHeight: 0.26, colorSeed: 21 });
+  libRow4.position.set(2.5, 1.94, -15.2);
+  root.add(libRow4);
+
+  place('cardboardBoxClosed', 2.3, -15.2, 2.22, -0.1, 1.6);
+  place('plantSmall2', 2.75, -15.2, 2.22, 0, 1.5);
+
+  // Closed storage cabinets along eastern wall of library
+  place('bookcaseClosedWide', 5.0, -15.2, 0.12, 0, 2.1);
+  place('cardboardBoxClosed', 4.8, -15.2, 2.22, 0.12, 1.6);
+  place('cardboardBoxOpen', 5.3, -15.2, 2.22, -0.08, 1.6);
+
+  place('bookcaseClosedDoors', 7.5, -15.2, 0.12, 0, 2.1);
+  place('plantSmall1', 7.5, -15.2, 2.22, 0, 1.6);
+
+  // Architectural bookcase divider near reading lounge (facing east)
+  place('bookcaseOpenLow', -4.5, -10.0, 0.12, Math.PI / 2, 2.0);
+  const divRow1 = createShelfBookRow(0.66, 0.22, { colorSeed: 25 });
+  divRow1.rotation.y = Math.PI / 2;
+  divRow1.position.set(-4.5, 0.42, -10.0);
+  root.add(divRow1);
+
+  const divRow2 = createShelfBookRow(0.66, 0.22, { colorSeed: 28 });
+  divRow2.rotation.y = Math.PI / 2;
+  divRow2.position.set(-4.5, 0.92, -10.0);
+  root.add(divRow2);
+
+  place('plantSmall2', -4.5, -10.0, 1.25, 0, 1.5);
 
   // Reading lounge in library
   place('rugRectangle', 1.5, -11.5, 0.14, 0, 2.4);
-  place('loungeDesignChair', 4, -10.5, 0.14, -Math.PI / 4, 2.0); // Sephora Johnson
+  place('loungeDesignChair', 4, -10.5, 0.14, -Math.PI / 4, 2.0); // Sephora Johnson sits here
   place('pillow', 4, -10.5, 0.58, -Math.PI / 4, 1.6);
-  place('loungeChairRelax', -2, -12, 0.14, Math.PI / 4, 2.0); // Vanessa Brisker
+  place('loungeChairRelax', -2, -12, 0.14, Math.PI / 4, 2.0); // Vanessa Brisker sits here
   place('tableCoffeeSquare', 1, -11.5, 0.14, 0, 2.0);
-  place('books', 1, -11.5, 0.75, 0.2, 1.8);
+  place('books', 0.85, -11.5, 0.75, 0.2, 1.8);
+
+  const readingMug = createCoffeeMug('#ffffff');
+  readingMug.position.set(1.2, 0.75, -11.5);
+  root.add(readingMug);
+
+  const readingStack = createBookStack(2, 0.2, 0.24, 30);
+  readingStack.position.set(1.0, 0.75, -11.3);
+  root.add(readingStack);
+
   place('lampRoundFloor', -3.2, -14.2, 0.12, 0, 2.2);
   place('pottedPlant', 7, -13.5, 0.12, 0, 2.4);
 
   // --- 5. LOUNGE & BREAK PATIO (north-west, around x: -12, z: -12) ---
   place('rugRound', -12, -12, 0.14, 0, 2.8);
   place('loungeDesignSofa', -12, -13.2, 0.14, 0, 2.2);
-  place('pillow', -12.7, -13.1, 0.62, 0.15, 1.7);
-  place('pillowBlue', -11.3, -13.1, 0.62, -0.15, 1.7);
+  place('pillowLong', -12.7, -13.1, 0.62, 0.15, 1.6);
+  place('pillowBlueLong', -11.3, -13.1, 0.62, -0.15, 1.6);
   place('loungeDesignChair', -10, -11, 0.14, -Math.PI / 3, 2.0);
   place('tableCoffeeGlass', -12, -11.5, 0.14, 0, 2.2);
   place('plantSmall3', -12, -11.5, 0.75, 0, 1.5);
 
-  // Coffee & refreshment station
+  const patioMug = createCoffeeMug('#f8fafc');
+  patioMug.position.set(-12.2, 0.65, -11.4);
+  root.add(patioMug);
+
+  place('books', -11.8, -11.5, 0.65, 0.4, 1.6);
+
+  // Full kitchenette refreshment station
   place('kitchenCabinet', -15.2, -13.5, 0.12, Math.PI / 2, 2.0);
   place('kitchenCoffeeMachine', -15.2, -13.5, 1.2, Math.PI / 2, 1.8);
+  place('kitchenFridgeSmall', -15.2, -15.0, 0.12, Math.PI / 2, 2.0);
+  place('kitchenMicrowave', -15.2, -12.0, 1.2, Math.PI / 2, 1.6);
+
+  const kitchenMug1 = createCoffeeMug('#3b82f6');
+  kitchenMug1.position.set(-15.1, 1.2, -13.1);
+  root.add(kitchenMug1);
+
+  const kitchenMug2 = createCoffeeMug('#10b981');
+  kitchenMug2.position.set(-15.1, 1.2, -13.9);
+  root.add(kitchenMug2);
 
   // Potted indoor trees in lounge
   place('pottedPlant', -15.2, -10.5, 0.12, 0, 2.4);
   place('lampSquareFloor', -9.2, -13.8, 0.12, 0, 2.0);
 
-  // --- 6. CONNECTING CORRIDORS & ENTRANCE (around x: -5, z: 1) ---
+  // --- 6. CONNECTING CORRIDORS & SHARED AMENITIES (around x: -5, z: 1) ---
   place('coatRackStanding', -5.8, 2.5, 0.12, 0, 2.0);
   place('pottedPlant', -5.8, -0.5, 0.12, 0, 2.2); // Denise Ricca is nearby at (-5, 1)
   place('speaker', -4.5, 0.5, 0.12, 0, 1.8);
+
+  // Central corridor hydration station (Water cooler dispenser)
+  const corridorWater = createWaterDispenser();
+  corridorWater.position.set(-5.2, 0.12, -2.5);
+  root.add(corridorWater);
+  place('trashcan', -5.2, -1.8, 0.12, 0, 1.8);
+
+  // Meeting wing hydration station
+  const meetingWater = createWaterDispenser();
+  meetingWater.position.set(-8.8, 0.12, 6.2);
+  root.add(meetingWater);
+  place('trashcan', -8.8, 5.5, 0.12, 0, 1.8);
+
+  // Side console storage and boxes in open office periphery
+  place('sideTableDrawers', 7.2, 1.5, 0.12, -Math.PI / 2, 2.0);
+  place('plantSmall1', 7.2, 1.5, 1.05, 0, 1.5);
+  place('cardboardBoxClosed', 7.2, 2.5, 0.12, 0.2, 1.6);
 
   scene.add(root);
 }

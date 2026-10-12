@@ -46,7 +46,8 @@ export function IsoCanvas() {
     renderer.domElement.tabIndex = 0;
     container.appendChild(renderer.domElement);
 
-    const d = 15;
+    // Reference-matching immersive isometric view extent (fills the viewport)
+    const d = 10.2;
     const camera = new THREE.OrthographicCamera(-d, d, d, -d, 0.1, 400);
     const initial = useStore.getState().camera;
     // Classic isometric angle
