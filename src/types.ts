@@ -3,6 +3,7 @@ export type OfficeRole = 'owner' | 'admin' | 'member' | 'guest';
 export interface User {
   id: string; name: string; status: Presence; role: string; department: string; location: string;
   portrait: { skin: string; hair: string; shirt: string; background: string; longHair?: boolean; beard?: boolean };
+  avatarUrl?: string;
 }
 export interface Office { id: string; name: string; role: OfficeRole; membershipPolicy: 'approval' | 'invite-only'; assignedChannelIds: string[] }
 export interface Channel { id: string; name: string; unread: number; memberIds: string[]; description: string }

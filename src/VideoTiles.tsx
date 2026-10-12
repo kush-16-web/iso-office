@@ -14,7 +14,13 @@ export function VideoTiles() {
       {call.participantIds.slice(0, 3).map((id, i) => {
         const user = userById(id);
         return <button className={`video-tile video-tile--${i} ${id === 'me' ? 'is-you' : ''}`} key={id} onClick={() => useStore.getState().selectProfile(id)} aria-label={`View ${user.name}'s profile from demo call`}>
-          <div className="video-portrait"><Avatar user={user} size={i === 1 ? 66 : 136} status={false}/></div>
+          <div className="video-portrait">
+            {user.avatarUrl ? (
+              <img src={user.avatarUrl} alt={user.name} className="video-feed-img" />
+            ) : (
+              <Avatar user={user} size={i === 1 ? 66 : 136} status={false}/>
+            )}
+          </div>
           <span className="tile-top-icon">{i === 1 ? <Volume2 size={15}/> : <Video size={14}/>}</span><span className="tile-mic">{id === 'me' && !isMuted ? <Volume2 size={14}/> : <MicOff size={14}/>}</span>
           {id === 'me' && isCameraOn && <small className="camera-preview-label">Camera preview</small>}
           <span className="tile-name">{user.name}{id === 'me' && ' (You)'}</span>

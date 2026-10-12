@@ -1,11 +1,11 @@
 import type { Channel, Message, User } from './types';
 const portrait = (skin: string, hair: string, shirt: string, background: string, longHair = false, beard = false) => ({ skin, hair, shirt, background, longHair, beard });
-export const currentUser: User = { id: 'me', name: 'Mark Verona', status: 'online', role: 'Frontend Developer', department: 'Tech', location: 'Public space', portrait: portrait('#f3bd99', '#ba4d31', '#384d67', '#f2e9e2', false, true) };
+export const currentUser: User = { id: 'me', name: 'Mark Verona', status: 'online', role: 'Frontend Developer', department: 'Tech', location: 'Public space', avatarUrl: '/portraits/me.jpg', portrait: portrait('#f3bd99', '#ba4d31', '#384d67', '#f2e9e2', false, true) };
 export const coworkers: User[] = [
-  { id: 'gregoria', name: 'Gregoria Comacho', status: 'online', role: 'Data Analyst', department: 'Tech', location: 'Public space', portrait: portrait('#e0af88', '#49322d', '#176853', '#e5efe8', true) },
+  { id: 'gregoria', name: 'Gregoria Comacho', status: 'online', role: 'Data Analyst', department: 'Tech', location: 'Public space', avatarUrl: '/portraits/gregoria.jpg', portrait: portrait('#e0af88', '#49322d', '#176853', '#e5efe8', true) },
   { id: 'christeen', name: 'Christeen Violette', status: 'in-call', role: 'Product Designer', department: 'Design', location: 'Public space', portrait: portrait('#bb8265', '#25222c', '#5781ad', '#e5eaf1', true) },
   { id: 'deane', name: 'Deane Chadburn', status: 'away', role: 'Engineering Lead', department: 'Tech', location: 'Public space', portrait: portrait('#ca936e', '#4c362c', '#c7674d', '#f4dfd3', false, true) },
-  { id: 'elisa', name: 'Elisa Lona', status: 'in-call', role: 'Product Manager', department: 'Product', location: 'Meeting rooms', portrait: portrait('#e5b08e', '#30282a', '#516573', '#e2ecee', true) },
+  { id: 'elisa', name: 'Elisa Lona', status: 'in-call', role: 'Product Manager', department: 'Product', location: 'Meeting rooms', avatarUrl: '/portraits/elisa.jpg', portrait: portrait('#e5b08e', '#30282a', '#516573', '#e2ecee', true) },
   { id: 'wilbert', name: 'Wilbert Prewitt', status: 'in-call', role: 'Backend Developer', department: 'Tech', location: 'Meeting rooms', portrait: portrait('#ac795b', '#272222', '#354051', '#e8e1d8', false, true) },
   { id: 'sephora', name: 'Sephora Johnson', status: 'online', role: 'People Partner', department: 'People', location: 'Lounge & library', portrait: portrait('#e0b38e', '#817052', '#8ac8d6', '#e4f0f4') },
   { id: 'vanessa', name: 'Vanessa Brisker', status: 'in-call', role: 'UX Researcher', department: 'Design', location: 'Lounge & library', portrait: portrait('#efba9a', '#5e332b', '#b56358', '#f2e3da', true) },
@@ -13,7 +13,7 @@ export const coworkers: User[] = [
   { id: 'denise', name: 'Denise Ricca', status: 'online', role: 'Customer Success', department: 'Operations', location: 'Public space', portrait: portrait('#b58163', '#332926', '#64546a', '#eae7e1', true) },
   { id: 'kaeya', name: 'Kaeya Furlong', status: 'in-call', role: 'QA Engineer', department: 'Tech', location: 'Meeting rooms', portrait: portrait('#deac89', '#76613e', '#66a7b6', '#e2eced') },
   { id: 'edgar', name: 'Edgar Enríquez', status: 'offline', role: 'Operations Lead', department: 'Operations', location: 'Meeting rooms', portrait: portrait('#cf9b76', '#3a2928', '#a85248', '#eee3d9', false, true) },
-  { id: 'keely', name: 'Keely Jansen', status: 'online', role: 'Creative Director', department: 'Design', location: 'Public space', portrait: portrait('#936045', '#241e20', '#2f4841', '#ede1d3', true) },
+  { id: 'keely', name: 'Keely Jansen', status: 'online', role: 'Creative Director', department: 'Design', location: 'Public space', avatarUrl: '/portraits/keely.jpg', portrait: portrait('#936045', '#241e20', '#2f4841', '#ede1d3', true) },
 ];
 export const users = [currentUser, ...coworkers];
 export const userById = (id: string) => users.find(user => user.id === id) ?? currentUser;
